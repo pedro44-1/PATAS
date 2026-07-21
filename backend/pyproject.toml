@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-m 'not integration'"
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+    "integration: marks tests as integration tests (skipped by default, run with -m integration)",
+]

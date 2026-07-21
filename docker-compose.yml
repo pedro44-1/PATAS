@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: patas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: patas
+      POSTGRES_USER: patas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-patas_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U patas -d patas"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: patas_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    container_name: patas_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://patas:${POSTGRES_PASSWORD:-patas_dev_password}@db:5432/patas
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-in-production}
+      APP_ENV: ${APP_ENV:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:80}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: patas_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:80
+    depends_on:
+      - backend
+
+  nginx-lb:
+    build:
+      context: ./nginx-lb
+      dockerfile: Dockerfile
+    container_name: patas_nginx_lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./nginx-lb/nginx-ssl.conf:/etc/nginx/nginx.conf
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: patas_certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+    entrypoint: >
+      sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done"
+
+volumes:
+  db_data:
+  redis_data:
+  certbot_www:
+  certbot_conf:

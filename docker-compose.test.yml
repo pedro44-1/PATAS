@@ -1,0 +1,50 @@
+services:
+  db_test:
+    image: postgres:16-alpine
+    container_name: patas_db_test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: patas_test
+      POSTGRES_USER: patas
+      POSTGRES_PASSWORD: patas_test_password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U patas -d patas_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis_test:
+    image: redis:7-alpine
+    container_name: patas_redis_test
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend_test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: patas_backend_test
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://patas:patas_test_password@db_test:5432/patas_test
+      REDIS_URL: redis://redis_test:6379/0
+      SECRET_KEY: test-secret-key-for-integration-tests
+      ENCRYPTION_KEY: test-encryption-key-for-integration-tests
+      APP_ENV: test
+      CORS_ORIGINS: "*"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      db_test:
+        condition: service_healthy
+      redis_test:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
