@@ -1,0 +1,280 @@
+{
+  "app": {
+    "name": "PATAS",
+    "tagline": "Clínica Veterinária"
+  },
+  "nav": {
+    "dashboard": "Painel",
+    "appointments": "Consultas",
+    "owners": "Donos",
+    "pets": "Animais",
+    "treatments": "Tratamentos",
+    "invoices": "Faturas",
+    "settings": "Configurações",
+    "logout": "Terminar sessão"
+  },
+  "auth": {
+    "login": "Entrar",
+    "email": "Email",
+    "password": "Palavra-passe",
+    "loginButton": "Entrar na conta",
+    "loggingIn": "A iniciar sessão...",
+    "loginError": "Email ou palavra-passe incorretos",
+    "demoUsers": "Utilizadores de demonstração"
+  },
+  "dashboard": {
+    "title": "Painel",
+    "greeting": "Bom dia",
+    "greetingAfternoon": "Boa tarde",
+    "greetingEvening": "Boa noite",
+    "upcoming": "Próximas consultas",
+    "noUpcoming": "Nenhuma consulta agendada",
+    "stats": {
+      "pets": "Animais",
+      "owners": "Donos",
+      "appointments": "Consultas",
+      "treatments": "Tratamentos"
+    }
+  },
+  "appointments": {
+    "title": "Consultas",
+    "new": "Nova Consulta",
+    "edit": "Editar Consulta",
+    "noResults": "Nenhuma consulta para este dia",
+    "create": "Registar Consulta",
+    "form": {
+      "animal": "Animal",
+      "selectAnimal": "Selecionar animal",
+      "dateTime": "Data e Hora",
+      "reason": "Motivo da Consulta",
+      "reasonPlaceholder": "Ex: Vacinação, Consulta geral, Exame de sangue",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas adicionais",
+      "duration": "Duração",
+      "weight": "Peso registado (kg)",
+      "weightPlaceholder": "Ex: 12.5"
+    },
+    "table": {
+      "time": "Hora",
+      "animal": "Animal",
+      "reason": "Motivo",
+      "duration": "Duração",
+      "status": "Estado",
+      "actions": "Ações"
+    },
+    "status": {
+      "scheduled": "Agendada",
+      "completed": "Concluída",
+      "cancelled": "Cancelada",
+      "no-show": "Faltou"
+    },
+    "actions": {
+      "complete": "Concluir",
+      "cancel": "Cancelar"
+    }
+  },
+  "owners": {
+    "title": "Donos",
+    "new": "Novo Dono",
+    "edit": "Editar Dono",
+    "noResults": "Nenhum dono encontrado",
+    "clearSearch": "Limpar pesquisa",
+    "search": "Pesquisar por nome, email ou telefone...",
+    "count": "{{count}} dono registado",
+    "count_plural": "{{count}} donos registados",
+    "form": {
+      "name": "Nome completo",
+      "phone": "Telefone",
+      "phonePlaceholder": "+244 923 456 789",
+      "email": "Email",
+      "emailPlaceholder": "email@exemplo.com",
+      "address": "Endereço",
+      "addressPlaceholder": "Rua, número, bairro",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas adicionais"
+    },
+    "table": {
+      "name": "Nome",
+      "phone": "Telefone",
+      "email": "Email",
+      "address": "Endereço",
+      "actions": "Ações"
+    }
+  },
+  "pets": {
+    "title": "Animais",
+    "new": "Novo Animal",
+    "edit": "Editar Animal",
+    "noResults": "Nenhum animal encontrado",
+    "search": "Pesquisar por nome, espécie ou raça...",
+    "count": "{{count}} animal registado",
+    "count_plural": "{{count}} animais registados",
+    "form": {
+      "owner": "Dono",
+      "selectOwner": "Selecionar dono",
+      "name": "Nome",
+      "namePlaceholder": "Nome do animal",
+      "species": "Espécie",
+      "breed": "Raça",
+      "selectBreed": "Selecionar raça",
+      "breedPlaceholder": "Descrição da espécie",
+      "breedOptions": "{{count}} opções",
+      "birthDate": "Data de Nascimento",
+      "weight": "Peso (kg)",
+      "weightPlaceholder": "Ex: 12.5",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas adicionais",
+      "ageDisplay": "{{age}} de idade",
+      "birthDateFormatted": "nasc. {{date}}"
+    },
+    "table": {
+      "animal": "Animal",
+      "speciesBreed": "Espécie / Raça",
+      "age": "Idade",
+      "weight": "Peso",
+      "actions": "Ações",
+      "view": "Ver"
+    },
+    "detail": {
+      "title": "Detalhes do Animal",
+      "tabs": {
+        "appointments": "Consultas",
+        "weight": "Peso",
+        "diagnostics": "Diagnósticos",
+        "treatments": "Tratamentos",
+        "invoices": "Faturas"
+      },
+      "weight": {
+        "history": "Histórico de Peso",
+        "subtitle": "Evolução do peso ao longo das consultas",
+        "noData": "Nenhum registo de peso encontrado",
+        "noDataHint": "O peso é registado nas consultas",
+        "lastWeight": "último peso",
+        "totalVariation": "variação total"
+      },
+      "diagnostics": {
+        "noData": "Nenhum diagnóstico registado",
+        "noDataHint": "Os diagnósticos são registados após as consultas",
+        "prescription": "Prescrição"
+      },
+      "appointments": {
+        "noData": "Nenhuma consulta registada"
+      },
+      "treatments": {
+        "noData": "Nenhum tratamento registado"
+      },
+      "invoices": {
+        "noData": "Nenhuma fatura registada"
+      }
+    },
+    "species": {
+      "Cão": "Cão",
+      "Gato": "Gato",
+      "Ave": "Ave",
+      "Roedor": "Roedor",
+      "Coelho": "Coelho",
+      "Réptil": "Réptil",
+      "Outro": "Outro"
+    }
+  },
+  "treatments": {
+    "title": "Tratamentos",
+    "new": "Novo Tratamento",
+    "edit": "Editar Tratamento",
+    "noResults": "Nenhum tratamento registado",
+    "form": {
+      "appointment": "Consulta",
+      "selectAppointment": "Selecionar consulta",
+      "diagnosis": "Diagnóstico",
+      "diagnosisPlaceholder": "Resultado do diagnóstico",
+      "prescription": "Prescrição / Medicação",
+      "prescriptionPlaceholder": "Medicação prescrita"
+    },
+    "table": {
+      "date": "Data",
+      "appointment": "Consulta",
+      "diagnosis": "Diagnóstico",
+      "prescription": "Prescrição",
+      "actions": "Ações"
+    }
+  },
+  "invoices": {
+    "title": "Faturas",
+    "new": "Nova Fatura",
+    "noResults": "Nenhuma fatura",
+    "pendingAlert": {
+      "label": "Total pendente de cobrança",
+      "hint": "{{amount}} Kz em {{count}} factura não paga",
+      "count_singular": "factura",
+      "count_plural": "facturas"
+    },
+    "filter": {
+      "all": "Todas",
+      "draft": "Rascunho",
+      "paid": "Pagas",
+      "cancelled": "Canceladas"
+    },
+    "form": {
+      "owner": "Dono",
+      "selectOwner": "Selecionar dono",
+      "amount": "Valor (Kz)",
+      "amountPlaceholder": "2500",
+      "description": "Descrição",
+      "descriptionPlaceholder": "Descrição da factura"
+    },
+    "table": {
+      "number": "Nº",
+      "owner": "Dono",
+      "value": "Valor",
+      "status": "Estado",
+      "description": "Descrição",
+      "date": "Data",
+      "actions": "Ações"
+    },
+    "status": {
+      "draft": "Rascunho",
+      "paid": "Paga",
+      "cancelled": "Cancelada"
+    },
+    "actions": {
+      "markPaid": "Paga"
+    }
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Criar",
+    "confirm": "Confirmar",
+    "loading": "A carregar...",
+    "error": "Ocorreu um erro",
+    "success": "Operação realizada com sucesso",
+    "required": "obrigatório",
+    "back": "Voltar",
+    "to": "a",
+    "min": "min",
+    "kg": "kg"
+  },
+  "form": {
+    "required": "*",
+    "optional": "(opcional)",
+    "selectOption": "Selecionar opção",
+    "minutes": "{{count}} minutos",
+    "age": {
+      "underMonth": "< 1 mês",
+      "month": "mês",
+      "months": "meses",
+      "year": "ano",
+      "years": "anos"
+    }
+  },
+  "status": {
+    "scheduled": "Agendada",
+    "completed": "Concluída",
+    "cancelled": "Cancelada",
+    "draft": "Rascunho",
+    "paid": "Paga",
+    "no-show": "Faltou"
+  }
+}

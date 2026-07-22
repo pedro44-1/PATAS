@@ -7,7 +7,7 @@ export interface Pet {
   name: string;
   species: string;
   breed: string | null;
-  age: string | null;
+  birth_date: string | null;
   weight: number | null;
   notes: string | null;
   created_at: string;
@@ -18,7 +18,7 @@ export interface PetCreate {
   name: string;
   species: string;
   breed?: string;
-  age?: string;
+  birth_date?: string;
   weight?: number;
   notes?: string;
 }

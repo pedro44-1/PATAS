@@ -1,150 +1,226 @@
-# PATAS — Vet Clinic Management SaaS
+# AGENTS.md — PATAS Veterinary Clinic SaaS
 
-> Codename. Angola market. Luanda/Benguela focus.
-
----
-
-## Product
-
-PATAS is a multi-tenant veterinary clinic management SaaS for the Angolan market.
-Replaces paper, Excel, and WhatsApp chaos with one clean web dashboard per clinic.
-
-**Phase 1:** Clinic-side only (owner app, SMS, AGT invoicing — Phase 2+)
-**Phase 2:** Owner mobile app, SMS reminders, Multicaixa payments
-**Phase 3:** AGT-compliant invoicing API, multi-vet, analytics
+> Angola market. Luanda/Benguela focus. Portuguese language UI.
+> **Current version: 0.2.0** (structure refactored)
 
 ---
 
-## Stack
+## Project Location
 
-| Layer | Tech |
-|---|---|
-| Backend | Python 3.11, FastAPI, SQLAlchemy 2.0, Pydantic v2, Alembic |
-| Database | PostgreSQL (prod) / SQLite (tests) |
-| Frontend | React 18, TypeScript, Vite, Tailwind, shadcn/ui |
-| Auth | JWT (access + refresh tokens), role-based (vet, receptionist) |
-| Deployment | Docker, Docker Compose, nginx, SSL |
+`C:\PATAS\` — completely separate from `C:\Warehouse-Startup`
 
 ---
 
 ## Architecture
 
 ```
-frontend/          React web dashboard (clinic staff)
-backend/          FastAPI REST API
-  app/
-    core/         Config, security, database
-    models/       SQLAlchemy models
-    schemas/      Pydantic schemas
-    api/v1/       Routers
-    services/     Business logic
+C:\PATAS\
+├── .github/
+│   └── workflows/
+│       └── ci.yml               ← lint + test + build on every PR
+│
+├── packages/
+│   └── shared-types/            ← TypeScript types from Pydantic schemas
+│       ├── src/
+│       │   ├── index.ts        ← barrel + common types
+│       │   ├── user.ts
+│       │   ├── owner.ts
+│       │   ├── pet.ts
+│       │   ├── appointment.ts
+│       │   ├── treatment.ts
+│       │   └── invoice.ts
+│       └── dist/               ← built by `npm run build`
+│
+├── backend/
+│   ├── src/                    ← FastAPI application (src/ not app/)
+│   │   ├── main.py             ← FastAPI entry point
+│   │   ├── seed.py             ← CLI: python -m src.seed
+│   │   ├── config.py           ← pydantic-settings
+│   │   ├── database.py         ← SQLAlchemy engine + session
+│   │   ├── security.py         ← JWT + password hashing
+│   │   ├── deps.py             ← get_db, CurrentUser, require_permission
+│   │   │
+│   │   ├── models/            ← SQLAlchemy models
+│   │   ├── schemas/           ← Pydantic v2 schemas
+│   │   ├── api/               ← Routers (no v1/ subfolder)
+│   │   └── services/           ← audit, cache, notifications
+│   │
+│   ├── migrations/             ← Alembic (NOT alembic/ at root)
+│   ├── tests/                ← pytest (NOT in src/)
+│   ├── scripts/               ← seed_permissions, seed_demo
+│   │
+│   ├── Dockerfile             ← multi-stage build
+│   ├── requirements.txt       ← pinned deps
+│   ├── requirements-dev.txt   ← black, ruff, mypy
+│   ├── pyproject.toml         ← PEP 621 metadata + tool config
+│   └── run.py                 ← python run.py (src.main:app)
+│
+├── frontend/
+│   ├── src/
+│   │   ├── main.tsx
+│   │   ├── App.tsx
+│   │   ├── i18n.ts           ← i18next configuration
+│   │   │
+│   │   ├── api/              ← axios client + typed API modules
+│   │   │
+│   │   ├── features/         ← self-contained feature modules
+│   │   │   ├── auth/         ← LoginPage, useAuth
+│   │   │   ├── dashboard/
+│   │   │   ├── owners/
+│   │   │   ├── pets/
+│   │   │   │   ├── PetsPage.tsx
+│   │   │   │   ├── PetDetailPage.tsx
+│   │   │   │   └── components/  ← PetIdentityCard, WeightChart...
+│   │   │   ├── appointments/
+│   │   │   ├── treatments/
+│   │   │   └── invoices/
+│   │   │
+│   │   ├── components/
+│   │   │   ├── ui/           ← shadcn primitives
+│   │   │   ├── layout/       ← Layout, Sidebar, TopBar
+│   │   │   └── shared/       ← ConfirmDialog, EmptyState...
+│   │   │
+│   │   ├── hooks/            ← shared custom hooks
+│   │   ├── locales/          ← i18n JSON files
+│   │   │   ├── pt.json       ← Portuguese (PT-AO first)
+│   │   │   └── en.json
+│   │   ├── lib/              ← utils, constants
+│   │   └── types/            ← app-specific TS types
+│   │
+│   ├── public/               ← PWA manifest, icons, sw.js
+│   ├── nginx.conf
+│   ├── Dockerfile
+│   └── package.json
+│
+├── infra/
+│   ├── docker-compose.yml      ← production (1 backend + 1 frontend + DB + Redis)
+│   ├── docker-compose.dev.yml  ← dev (volumes + hot-reload)
+│   ├── nginx/
+│   │   ├── nginx.conf         ← base reverse-proxy config
+│   │   └── nginx-ssl.conf    ← TLS config (certbot-ready)
+│   ├── .env.example          ← all env vars documented
+│   └── scripts/
+│       └── init-db.sh
+│
+├── docs/
+│   ├── api.md
+│   ├── setup.md
+│   └── ARCHITECTURE.md        ← system diagram, decisions
+│
+├── packages/                   ← npm workspace root
+├── .github/workflows/ci.yml
+├── Makefile                   ← `make dev`, `make test`, etc.
+├── docker-compose.yml         ← local dev (delegates to infra/)
+└── AGENTS.md
 ```
 
 ---
 
-## Multi-Tenant Design
+## Running Locally
 
-Each clinic is an isolated tenant.
+```powershell
+# Start everything (dev with hot-reload)
+make dev
 
-- Tenant identified by `clinic_id` on every authenticated request
-- JWT token carries `clinic_id` + `user_id` + `role`
-- All database queries scoped by `clinic_id`
-- Database: single Postgres instance, schema-per-tenant OR shared schema with `clinic_id` FKs
-  - **Decision: shared schema with `clinic_id` FKs** (simpler for MVP, migrate to schema-per-tenant at 20+ tenants)
+# Backend only
+make dev-backend
+
+# Run tests
+make test
+
+# Run seed
+make seed
+
+# Build frontend
+make build-ui
+
+# Stop
+make stop
+```
 
 ---
 
-## MVP Features — Phase 1 (v1.0)
+## Docker Stack
 
-### Clinic Dashboard
+| Container | Image | Purpose |
+|---|---|---|
+| `patas_db` | postgres:16-alpine | Primary database |
+| `patas_redis` | redis:7-alpine | Cache + JWT blacklist |
+| `patas_backend` | patas-backend | FastAPI API |
+| `patas_frontend` | patas-frontend | React SPA |
+| `patas_nginx_lb` | patas-nginx-lb | Reverse proxy |
 
-| Feature | Description |
-|---|---|
-| Auth | JWT login, vet + receptionist roles |
-| Dashboard home | Today's appointments at a glance |
-| Owners | Create, view, edit pet owners |
-| Pets | Register pets (species, breed, age, notes) |
-| Appointments | Calendar view, create, edit, mark complete |
-| Treatments | Log consultation notes, diagnosis, prescriptions |
-| Invoices | Basic invoice (non-AGT for now) |
+**API base URL:** `/api/v1` (proxied by nginx)
 
-### Out of Scope (Phase 2+)
+**Test credentials:**
+- `ana@patas.ao` / `patas2026` — vet
+- `carla@patas.ao` / `patas2026` — receptionist
 
-- Owner mobile app
-- SMS reminders
-- Push notifications
-- AGT-compliant invoicing
-- Multicaixa payment integration
-- Analytics / reporting
-- Multi-vet scheduling
+---
+
+## API Routes
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/v1/auth/login` | Login |
+| POST | `/api/v1/auth/register` | Register |
+| POST | `/api/v1/auth/refresh` | Refresh token |
+| GET | `/api/v1/auth/me` | Current user |
+| GET/POST | `/api/v1/owners/` | Owners CRUD |
+| GET/POST/PATCH/DELETE | `/api/v1/pets/` | Pets CRUD |
+| GET/POST | `/api/v1/appointments/` | Appointments CRUD |
+| GET/POST | `/api/v1/treatments/` | Treatments CRUD |
+| GET/POST | `/api/v1/invoices/` | Invoices CRUD |
+| GET | `/api/v1/dashboard/stats` | Dashboard stats |
+| GET | `/health` | Health check |
 
 ---
 
 ## Data Model
 
-### Core Entities
+| Model | Key Fields |
+|---|---|
+| Clinic | id, name |
+| User | id, clinic_id, name, email, role (vet/receptionist/admin) |
+| Owner | id, clinic_id, name, phone, email, address, notes |
+| Pet | id, clinic_id, owner_id, name, species, breed, birth_date, weight, notes |
+| Appointment | id, clinic_id, pet_id, vet_id, owner_id, scheduled_at, status, reason, notes, **weight** |
+| Treatment | id, clinic_id, appointment_id, diagnosis, notes, prescription |
+| Invoice | id, clinic_id, owner_id, appointment_id, amount, status, description, reason |
 
-```
-Clinic
-  id, name, address, phone, email, created_at
-
-User
-  id, clinic_id FK, name, email, password_hash, role (vet|receptionist), created_at
-
-Owner
-  id, clinic_id FK, name, phone, email, address, notes, created_at
-
-Pet
-  id, clinic_id FK, owner_id FK, name, species, breed, age, weight, notes, created_at
-
-Appointment
-  id, clinic_id FK, pet_id FK, vet_id FK, scheduled_at, duration_min, status (scheduled|completed|cancelled), notes
-
-Treatment
-  id, clinic_id FK, appointment_id FK, diagnosis, notes, prescription, created_at
-
-Invoice
-  id, clinic_id FK, owner_id FK, appointment_id FK, amount, status (draft|paid|cancelled), created_at
-```
+**Appointment status:** `scheduled`, `completed`, `cancelled`, `no-show`
+**Invoice status:** `draft`, `paid`, `cancelled`
 
 ---
 
-## Conventions
+## Known Bug Patterns — AVOID
+
+- ❌ `user.role.value` when `role` is already a plain string
+- ❌ `Treatment.pet_id` — model has no `pet_id`, only `appointment_id`
+- ❌ `Invoice.pet_id` — model has `owner_id` and `appointment_id`, not `pet_id`
+- ❌ `InvoiceStatus.PENDING` / `OVERDUE` — only `DRAFT`, `PAID`, `CANCELLED`
+- ✅ Use `EnumClass.value` only when `role` is an actual Enum
+
+---
+
+## Key Conventions
 
 - **No comments in code** unless logic is non-obvious
-- **Edit existing files** — do not create new files unless told
-- **Follow existing patterns** — imports, naming, style
-- **Run full test suite** before marking any task done: `python -m pytest`
-- **API-first** — all features accessible via REST API before UI
+- **Backend entry point:** `src.main:app` (not `app.main:app`)
+- **Import pattern:** `from src.models.xxx import ...`
+- **Test command:** `PYTHONPATH=/app pytest tests/ -q`
+- **i18n:** all UI strings go in `src/locales/pt.json` first
+- **Feature modules:** each domain has its own `features/<domain>/` directory with a barrel `index.ts`
+- **Never commit** `.env`, `*.db`, `node_modules/`
 
 ---
 
-## Testing
+## TODO (Next Up)
 
-- All tests in `backend/tests/`
-- SQLite for tests, PostgreSQL for production
-- `conftest.py` has fixture setup — update when adding models
-
----
-
-## Security
-
-- `SECRET_KEY` and `ENCRYPTION_KEY` env vars required
-- Passwords hashed with bcrypt
-- Role-based access: receptionist can CRUD owners/pets/appointments; vet can also write treatments
-- Never log tokens, passwords, or decrypted data
-- Never commit `.env` or `*.db`
-
----
-
-## Deployment
-
-**Prerequisites:** Domain registered, VPS (Yandex Cloud or equivalent), Docker + Docker Compose
-
-See `docs/deployment.md` for full deployment checklist.
-
----
-
-## Version
-
-Current: 0.1.0-draft
+1. **AGT invoicing** — generate AGT-compliant PDF invoices with QR code
+2. **Multicaixa payments** — ATM reference, Express, TPA integration
+3. **SMS reminders** — Africastalking or WhatsApp for appointment reminders
+4. **PWA / mobile-first** — lightweight mobile web for pet owners
+5. **Connect frontend API files** → use `@patas/shared-types` for types
+6. **Feature flags** — phase-gate Angola-specific payment features
+7. **VPS deployment** — domain + SSL via certbot on DigitalOcean

@@ -1,4 +1,4 @@
-def test_list_pets_empty(client, vet_headers):
+﻿def test_list_pets_empty(client, vet_headers):
     response = client.get("/api/v1/pets/", headers=vet_headers)
     assert response.status_code == 200
     assert response.json() == []
@@ -8,9 +8,8 @@ def test_create_pet(client, vet_headers, owner):
     response = client.post("/api/v1/pets/", headers=vet_headers, json={
         "owner_id": owner.id,
         "name": "Rex",
-        "species": "Cão",
+        "species": "CГЈo",
         "breed": "Labrador",
-        "age": "2 years",
         "weight": 25.0,
     })
     assert response.status_code == 200
@@ -60,12 +59,12 @@ def test_receptionist_can_manage_pets(client, receptionist_headers, owner):
 
 
 def test_pets_scoped_by_clinic(client, vet_headers, pet, db_session):
-    from app.models.clinic import Clinic
-    from app.models.pet import Pet
+    from src.models.clinic import Clinic
+    from src.models.pet import Pet
     other_clinic = Clinic(name="Other Clinic")
     db_session.add(other_clinic)
     db_session.commit()
-    other_pet = Pet(clinic_id=other_clinic.id, owner_id=pet.owner_id, name="Other Pet", species="Cão")
+    other_pet = Pet(clinic_id=other_clinic.id, owner_id=pet.owner_id, name="Other Pet", species="CГЈo")
     db_session.add(other_pet)
     db_session.commit()
 

@@ -1,0 +1,28 @@
+{
+  "app": {
+    "name": "PATAS",
+    "tagline": "Veterinary Clinic"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "appointments": "Appointments",
+    "owners": "Owners",
+    "pets": "Pets",
+    "treatments": "Treatments",
+    "invoices": "Invoices",
+    "settings": "Settings",
+    "logout": "Sign out"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Operation successful",
+    "required": "required"
+  }
+}

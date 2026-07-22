@@ -1,0 +1,99 @@
+# PATAS — Development Docker Compose (with hot-reload)
+# Usage: docker compose -f infra/docker-compose.yml -f infra/docker-compose.dev.yml up -d
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: patas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: patas
+      POSTGRES_USER: patas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-patas_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U patas -d patas"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: patas_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../backend/Dockerfile
+    container_name: patas_backend
+    restart: unless-stopped
+    # Hot-reload enabled via --reload flag
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DATABASE_URL: postgresql://patas:${POSTGRES_PASSWORD:-patas_dev_password}@db:5432/patas
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-32-bytes!!}
+      APP_ENV: development
+      CORS_ORIGINS: http://localhost:3000,http://localhost:80
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../frontend/Dockerfile
+    container_name: patas_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:80
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+
+  nginx:
+    build:
+      context: ../nginx-lb
+      dockerfile: ../nginx-lb/Dockerfile
+    container_name: patas_nginx_lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx-lb/nginx-ssl.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  db_data:
+  redis_data:

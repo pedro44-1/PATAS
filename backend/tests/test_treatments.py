@@ -1,4 +1,4 @@
-def test_list_treatments_empty(client, vet_headers):
+﻿def test_list_treatments_empty(client, vet_headers):
     response = client.get("/api/v1/treatments/", headers=vet_headers)
     assert response.status_code == 200
     assert response.json() == []
@@ -69,9 +69,9 @@ def test_receptionist_cannot_delete_treatment(client, receptionist_headers, trea
 
 
 def test_treatments_scoped_by_clinic(client, vet_headers, treatment, db_session):
-    from app.models.clinic import Clinic
-    from app.models.treatment import Treatment
-    from app.models.appointment import Appointment
+    from src.models.clinic import Clinic
+    from src.models.treatment import Treatment
+    from src.models.appointment import Appointment
     from datetime import datetime, timezone, timedelta
     other_clinic = Clinic(name="Other Clinic")
     db_session.add(other_clinic)

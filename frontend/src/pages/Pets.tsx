@@ -1,14 +1,71 @@
 import { useEffect, useState } from "react";
-import { petsApi, Pet, PetCreate } from "../api/pets";
-import { ownersApi, Owner } from "../api/owners";
+import { useNavigate } from "react-router-dom";
+import { petsApi, Pet, PetCreate } from "@/api/pets";
+import { ownersApi, Owner } from "@/api/owners";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { Plus, Pencil, Trash2, Search, PawPrint, ChevronRight, X } from "lucide-react";
+
+const SPECIES_OPTIONS = [
+  { value: "Cão", label: "Cão", breeds: ["SRD", "Pastor Alemão", "Labrador", "Bulldog", "Rottweiler", "Golden Retriever", "Pitbull", "Beagle", "Dálmata", "Husky", "Boxer", "Poodle", "Chihuahua", "Bulldog Francês", "Cocker Spaniel", "Doberman", "Outro"] },
+  { value: "Gato", label: "Gato", breeds: ["SRD", "Persa", "Siamês", "British Shorthair", "Maine Coon", "Ragdoll", "Bengal", "Scottish Fold", "Sphynx", "Russo Azul", "Angorá", "Burmês", "Bombay", "Exótico", "Outro"] },
+  { value: "Ave", label: "Ave", breeds: ["Papagaio", "Canário", "Periquito", "Cacatua", "Agapornis", "Diamante de Gould", "Ninfas", "Arara", "Jandaia", "Lorículo", "Outro"] },
+  { value: "Roedor", label: "Roedor", breeds: ["Hamster", "Porquinho-da-Índia", "Gerbil", "Rato", "Chinchila", "Fura-flor", "Esquilo", "Outro"] },
+  { value: "Coelho", label: "Coelho", breeds: ["Anão", "Mini Lop", "Holandês", "Flemish Giant", "Lionhead", "Rex", "Califórnia", "Novo Zelandês", "Outro"] },
+  { value: "Réptil", label: "Réptil", breeds: ["Dragão Barbudo", "Gecko", "Iguana", "Serpente", "Tartaruga", "Cágado", "Camaleão", "Teju", "Outro"] },
+  { value: "Outro", label: "Outro", breeds: [] },
+];
+
+function calculateAge(birthDate: string | null): string {
+  if (!birthDate) return "—";
+  const birth = new Date(birthDate);
+  const today = new Date();
+  const totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+  if (totalMonths < 1) return "< 1 mês";
+  if (totalMonths < 12) return `${totalMonths} mê${totalMonths !== 1 ? "ses" : "s"}`;
+  const years = Math.floor(totalMonths / 12);
+  if (years === 1) return "1 ano";
+  return `${years} anos`;
+}
+
+function speciesEmoji(species: string) {
+  const map: Record<string, string> = {
+    Cão: "🐶", Gato: "🐱", Ave: "🐦", Roedor: "🐹",
+    Coelho: "🐰", Réptil: "🦎", Outro: "🐾",
+  };
+  return map[species] ?? "🐾";
+}
 
 export default function Pets() {
+  const navigate = useNavigate();
   const [pets, setPets] = useState<Pet[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Pet | null>(null);
-  const [form, setForm] = useState<PetCreate>({ owner_id: 0, name: "", species: "", breed: "", age: "", weight: undefined });
+  const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [form, setForm] = useState({
+    owner_id: 0,
+    name: "",
+    species: "Cão",
+    breed: "",
+    birth_date: "",
+    weight: "" as string | undefined,
+  });
 
   function load() {
     Promise.all([petsApi.list(), ownersApi.list()])
@@ -21,9 +78,26 @@ export default function Pets() {
 
   useEffect(() => { load(); }, []);
 
+  const filtered = pets.filter((p) =>
+    search === "" ||
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.species.toLowerCase().includes(search.toLowerCase()) ||
+    (p.breed ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const currentSpecies = SPECIES_OPTIONS.find((s) => s.value === form.species);
+  const breedOptions = currentSpecies?.breeds ?? [];
+
   function openCreate() {
     setEditing(null);
-    setForm({ owner_id: owners[0]?.id ?? 0, name: "", species: "", breed: "", age: "", weight: undefined });
+    setForm({
+      owner_id: owners[0]?.id ?? 0,
+      name: "",
+      species: "Cão",
+      breed: "",
+      birth_date: "",
+      weight: undefined,
+    });
     setShowForm(true);
   }
 
@@ -34,25 +108,34 @@ export default function Pets() {
       name: pet.name,
       species: pet.species,
       breed: pet.breed ?? "",
-      age: pet.age ?? "",
-      weight: pet.weight ?? undefined,
+      birth_date: pet.birth_date ?? "",
+      weight: pet.weight !== null ? String(pet.weight) : undefined,
     });
     setShowForm(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = { ...form };
-    if (!payload.weight) payload.weight = undefined;
+    setSaving(true);
     try {
+      const payload: PetCreate = {
+        owner_id: form.owner_id,
+        name: form.name,
+        species: form.species,
+        breed: form.breed || undefined,
+        birth_date: form.birth_date || undefined,
+        weight: form.weight ? Number(form.weight) : undefined,
+      };
       if (editing) {
         await petsApi.update(editing.id, payload);
       } else {
-        await petsApi.create(payload as PetCreate);
+        await petsApi.create(payload);
       }
       setShowForm(false);
       load();
-    } catch {}
+    } catch {} finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(id: number) {
@@ -66,90 +149,292 @@ export default function Pets() {
   }
 
   return (
-    <div>
-      <div style={h.header}>
-        <h1 style={h.title}>Animais</h1>
-        <button onClick={openCreate} style={h.addBtn}>+ Novo Animal</button>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-extrabold text-dark-900">Animais</h2>
+          <p className="text-dark-400 text-sm mt-0.5">
+            {pets.length} animal{pets.length !== 1 ? "is" : ""} registado{pets.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <Button
+          onClick={openCreate}
+          className="bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Novo Animal
+        </Button>
       </div>
 
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+        <Input
+          placeholder="Pesquisar por nome, espécie ou raça..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10 h-11 rounded-xl bg-white border-dark-200"
+        />
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="w-6 h-6 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center py-16 text-dark-400">
+              <PawPrint className="w-10 h-10 mb-3 opacity-30" />
+              <p className="text-sm font-medium">Nenhum animal encontrado</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent border-b border-dark-100">
+                  <TableHead className="pl-5">Animal</TableHead>
+                  <TableHead>Espécie / Raça</TableHead>
+                  <TableHead>Idade</TableHead>
+                  <TableHead>Peso</TableHead>
+                  <TableHead className="pr-5 w-48 text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((p) => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(`/pets/${p.id}`)}
+                  >
+                    <TableCell className="pl-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center text-lg">
+                          {speciesEmoji(p.species)}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-dark-900 text-sm">{p.name}</div>
+                          <div className="text-dark-400 text-xs">{getOwnerName(p.owner_id)}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-sm text-dark-700">{p.species}</div>
+                      <div className="text-dark-400 text-xs">{p.breed ?? "—"}</div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-dark-600">{calculateAge(p.birth_date)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-dark-500">{p.weight ? `${p.weight} kg` : "—"}</span>
+                    </TableCell>
+                    <TableCell className="pr-5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => navigate(`/pets/${p.id}`)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
+                          title="Ver histórico"
+                        >
+                          Ver
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal */}
       {showForm && (
-        <div style={h.modalOverlay}>
-          <div style={h.modal}>
-            <h2 style={h.modalTitle}>{editing ? "Editar Animal" : "Novo Animal"}</h2>
-            <form onSubmit={handleSubmit} style={h.form}>
-              <select style={h.input} value={form.owner_id} onChange={(e) => setForm({ ...form, owner_id: Number(e.target.value) })} required>
-                <option value={0}>Selecionar dono</option>
-                {owners.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-              <input style={h.input} placeholder="Nome do animal *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              <input style={h.input} placeholder="Espécie (Cão, Gato, Pássaro...) *" value={form.species} onChange={(e) => setForm({ ...form, species: e.target.value })} required />
-              <input style={h.input} placeholder="Raça" value={form.breed} onChange={(e) => setForm({ ...form, breed: e.target.value })} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
-                <input style={h.input} placeholder="Idade (ex: 3 anos)" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
-                <input style={h.input} type="number" step="0.1" placeholder="Peso (kg)" value={form.weight ?? ""} onChange={(e) => setForm({ ...form, weight: e.target.value ? Number(e.target.value) : undefined })} />
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <div>
+                <h2 className="font-bold text-dark-900">
+                  {editing ? "Editar Animal" : "Novo Animal"}
+                </h2>
+                <p className="text-dark-400 text-xs mt-0.5">
+                  {editing ? `A editar ${editing.name}` : "Registar um novo animal"}
+                </p>
               </div>
-              <div style={h.formBtns}>
-                <button type="button" onClick={() => setShowForm(false)} style={h.cancelBtn}>Cancelar</button>
-                <button type="submit" style={h.saveBtn}>{editing ? "Guardar" : "Criar"}</button>
+              <button
+                onClick={() => setShowForm(false)}
+                className="w-8 h-8 rounded-xl bg-dark-100 flex items-center justify-center text-dark-400 hover:text-dark-700 hover:bg-dark-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {/* Owner */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-dark-600">
+                  Dono *
+                </Label>
+                <select
+                  value={form.owner_id}
+                  onChange={(e) => setForm({ ...form, owner_id: Number(e.target.value) })}
+                  className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
+                  required
+                >
+                  <option value={0}>Selecionar dono</option>
+                  {owners.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Name + Species */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-dark-600">Nome *</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Nome do animal"
+                    required
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-dark-600">Espécie *</Label>
+                  <select
+                    value={form.species}
+                    onChange={(e) => setForm({ ...form, species: e.target.value, breed: "" })}
+                    className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
+                    required
+                  >
+                    {SPECIES_OPTIONS.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Breed */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-dark-600">
+                  Raça {breedOptions.length > 0 && `— ${breedOptions.length} opções`}
+                </Label>
+                {breedOptions.length > 0 ? (
+                  <select
+                    value={form.breed}
+                    onChange={(e) => setForm({ ...form, breed: e.target.value })}
+                    className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
+                  >
+                    <option value="">Selecionar raça</option>
+                    {breedOptions.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={form.breed}
+                    onChange={(e) => setForm({ ...form, breed: e.target.value })}
+                    placeholder="Descrição da espécie"
+                    className="h-11 rounded-xl"
+                  />
+                )}
+              </div>
+
+              {/* Birth date + Weight */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-dark-600">
+                    Data de Nascimento
+                  </Label>
+                  <input
+                    type="date"
+                    value={form.birth_date}
+                    max={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
+                    className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-dark-600">Peso (kg)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={form.weight ?? ""}
+                    onChange={(e) =>
+                      setForm({ ...form, weight: e.target.value || undefined })
+                    }
+                    placeholder="Ex: 12.5"
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              {/* Age display */}
+              {form.birth_date && (
+                <div className="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
+                  <p className="text-brand-700 text-sm font-semibold">
+                    {calculateAge(form.birth_date)} de idade
+                  </p>
+                  <p className="text-brand-500 text-xs mt-0.5">
+                    {new Date(form.birth_date).toLocaleDateString("pt-AO", { year: "numeric", month: "long", day: "numeric" })}
+                  </p>
+                </div>
+              )}
+
+              {/* Modal footer */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-dark-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowForm(false)}
+                  className="rounded-xl h-11"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-brand-600 hover:bg-brand-700 rounded-xl h-11 font-semibold"
+                >
+                  {saving ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      A guardar...
+                    </span>
+                  ) : editing ? (
+                    "Guardar Alterações"
+                  ) : (
+                    "Registar Animal"
+                  )}
+                </Button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      <div style={h.card}>
-        {loading ? <p style={h.empty}>A carregar...</p> : pets.length === 0 ? (
-          <p style={h.empty}>Nenhum animal registado.</p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #f0f0f0" }}>
-                <th style={h.th}>Nome</th>
-                <th style={h.th}>Espécie</th>
-                <th style={h.th}>Raça</th>
-                <th style={h.th}>Dono</th>
-                <th style={h.th}>Idade</th>
-                <th style={{ ...h.th, width: 100 }}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pets.map((p) => (
-                <tr key={p.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
-                  <td style={h.td}>{p.name}</td>
-                  <td style={h.td}>{p.species}</td>
-                  <td style={{ ...h.td, color: "#666" }}>{p.breed ?? "—"}</td>
-                  <td style={{ ...h.td, color: "#666" }}>{getOwnerName(p.owner_id)}</td>
-                  <td style={{ ...h.td, color: "#666" }}>{p.age ?? "—"}</td>
-                  <td style={h.td}>
-                    <button onClick={() => openEdit(p)} style={h.editBtn}>Editar</button>
-                    <button onClick={() => handleDelete(p.id)} style={h.deleteBtn}>X</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   );
 }
-
-const h: Record<string, React.CSSProperties> = {
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" },
-  title: { fontSize: "1.75rem", fontWeight: 700, color: "#1a1a2e" },
-  addBtn: { padding: "0.6rem 1.2rem", background: "#4caf50", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: "0.95rem" },
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 },
-  modal: { background: "#fff", borderRadius: 16, padding: "2rem", width: 480, maxWidth: "95vw" },
-  modalTitle: { marginTop: 0, marginBottom: "1.5rem", color: "#1a1a2e" },
-  form: { display: "flex", flexDirection: "column", gap: "0.8rem" },
-  input: { padding: "0.65rem 0.9rem", border: "1.5px solid #e0e0e0", borderRadius: 8, fontSize: "0.95rem", width: "100%", boxSizing: "border-box" },
-  formBtns: { display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "0.5rem" },
-  cancelBtn: { padding: "0.6rem 1.2rem", background: "#f0f0f0", color: "#333", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 },
-  saveBtn: { padding: "0.6rem 1.2rem", background: "#4caf50", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 },
-  card: { background: "#fff", borderRadius: 14, padding: "1.5rem", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" },
-  empty: { color: "#aaa", textAlign: "center", padding: "3rem", fontSize: "0.95rem" },
-  th: { textAlign: "left", padding: "0.6rem 0.5rem", color: "#888", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em" },
-  td: { padding: "0.75rem 0.5rem", fontSize: "0.95rem" },
-  editBtn: { padding: "0.3rem 0.7rem", background: "#e3f2fd", color: "#1565c0", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", marginRight: 6 },
-  deleteBtn: { padding: "0.3rem 0.7rem", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" },
-};

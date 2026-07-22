@@ -1,9 +1,9 @@
-"""Test that Alembic migrations generate valid SQL for PostgreSQL (offline mode)."""
+﻿"""Test that Alembic migrations generate valid SQL for PostgreSQL (offline mode)."""
 import os
 import sys
 from alembic.config import Config
 from alembic import command
-from app.core.config import settings
+from src.core.config import settings
 
 
 def test_migrations():
@@ -44,7 +44,7 @@ def test_migrations():
     with context.begin_transaction():
         context.run_migrations()
     
-    print("\n✓ All migration SQL generated successfully for PostgreSQL")
+    print("\nвњ“ All migration SQL generated successfully for PostgreSQL")
 
 
 if __name__ == "__main__":

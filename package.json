@@ -1,0 +1,16 @@
+{
+  "name": "patas",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "frontend"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace=@patas/shared-types",
+    "build:frontend": "npm run build --workspace=patas-frontend",
+    "build": "npm run build:shared && npm run build:frontend",
+    "dev:frontend": "npm run dev --workspace=patas-frontend",
+    "dev:backend": "cd backend && python run.py"
+  },
+  "devDependencies": {}
+}

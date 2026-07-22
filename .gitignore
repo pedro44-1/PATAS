@@ -1,15 +1,54 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
+*.py[cod]
 *.pyc
-.venv/
-*.db
-*.db-shm
-*.db-wal
-.env
-node_modules/
-dist/
-.vite/
 *.egg-info/
-.pytest_cache/
+dist/
+build/
+
+# Test databases
+*.db
+*.db-journal
 alembic_test.db
 seed_test.db
 test.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# ─── Node.js ──────────────────────────────────────────────────────────────────
+node_modules/
+.npm
+.pnpm-store/
+
+# Frontend build output
+frontend/dist/
+frontend/.vite/
+
+# Shared-types build output
+packages/shared-types/dist/
+*.tsbuildinfo
+
+# ─── Docker ────────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+Thumbs.db
+
+# ─── Certbot ──────────────────────────────────────────────────────────────────
+certbot_conf/
+certbot_www/

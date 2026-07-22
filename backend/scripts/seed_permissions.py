@@ -1,8 +1,8 @@
-from sqlalchemy.orm import Session
+﻿from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
-from app.models.permission import Permission
-from app.models.role_permission import RolePermission
+from src.core.database import SessionLocal
+from src.models.permission import Permission
+from src.models.role_permission import RolePermission
 
 
 ALL_PERMISSIONS = [
@@ -17,7 +17,7 @@ ALL_PERMISSIONS = [
     {"codename": "invoice:read", "description": "Listar e ver faturas"},
     {"codename": "invoice:write", "description": "Criar, editar e remover faturas"},
     {"codename": "user:read", "description": "Listar e ver utilizadores"},
-    {"codename": "user:write", "description": "Gerir funções dos utilizadores"},
+    {"codename": "user:write", "description": "Gerir funГ§Гµes dos utilizadores"},
 ]
 
 ROLE_PERMISSIONS = {

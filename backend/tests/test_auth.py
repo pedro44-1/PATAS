@@ -1,5 +1,5 @@
-def test_register(client, db_session):
-    from app.models.clinic import Clinic
+﻿def test_register(client, db_session):
+    from src.models.clinic import Clinic
     response = client.post("/api/v1/auth/register", json={
         "name": "New User",
         "email": "new@test.com",
@@ -20,7 +20,7 @@ def test_register_duplicate_email(client, vet_user):
         "password": "Password1",
     })
     assert response.status_code == 400
-    assert "Email já registado" in response.text
+    assert "Email jГЎ registado" in response.text
 
 
 def test_login_success(client, vet_user):

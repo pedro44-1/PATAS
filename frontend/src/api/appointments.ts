@@ -7,10 +7,13 @@ export interface Appointment {
   clinic_id: number;
   pet_id: number;
   vet_id: number;
+  owner_id: number;
   scheduled_at: string;
   duration_min: number;
   status: AppointmentStatus;
+  reason: string | null;
   notes: string | null;
+  weight: number | null;
   created_at: string;
 }
 
@@ -19,7 +22,9 @@ export interface AppointmentCreate {
   vet_id: number;
   scheduled_at: string;
   duration_min?: number;
+  reason?: string;
   notes?: string;
+  weight?: number;
 }
 
 export const appointmentsApi = {

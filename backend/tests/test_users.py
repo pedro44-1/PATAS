@@ -1,4 +1,4 @@
-def test_admin_can_list_users(client, vet_headers, receptionist_user):
+﻿def test_admin_can_list_users(client, vet_headers, receptionist_user):
     response = client.get("/api/v1/users/", headers=vet_headers)
     assert response.status_code == 200
     users = response.json()

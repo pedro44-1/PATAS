@@ -1,4 +1,4 @@
-import os
+﻿import os
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 
 import pytest
@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import fakeredis.aioredis
 
-from app.core.database import get_db, Base
-from app.core.security import hash_password
-from app.models import *
-from app.services.cache import cache as cache_service
+from src.core.database import get_db, Base
+from src.core.security import hash_password
+from src.models import *
+from src.services.cache import cache as cache_service
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -81,7 +81,7 @@ def seed_permission_data(setup_database):
 
 @pytest.fixture(scope="function")
 def db_session():
-    from app.main import app
+    from src.main import app
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
@@ -93,7 +93,7 @@ def db_session():
 
 @pytest.fixture(scope="function")
 def client(db_session):
-    from app.main import app
+    from src.main import app
 
     def override_get_db():
         try:
@@ -109,7 +109,7 @@ def client(db_session):
 
 @pytest.fixture(scope="function")
 def clinic(db_session):
-    from app.models.clinic import Clinic
+    from src.models.clinic import Clinic
     clinic = Clinic(name="Test Clinic", address="Test Address", phone="123456789", email="test@clinic.com")
     db_session.add(clinic)
     db_session.commit()
@@ -119,7 +119,7 @@ def clinic(db_session):
 
 @pytest.fixture(scope="function")
 def vet_user(db_session, clinic):
-    from app.models.user import User, UserRole
+    from src.models.user import User, UserRole
     user = User(
         clinic_id=clinic.id,
         name="Dr. Vet",
@@ -135,7 +135,7 @@ def vet_user(db_session, clinic):
 
 @pytest.fixture(scope="function")
 def receptionist_user(db_session, clinic):
-    from app.models.user import User, UserRole
+    from src.models.user import User, UserRole
     user = User(
         clinic_id=clinic.id,
         name="Receptionist",
@@ -173,7 +173,7 @@ def receptionist_headers(receptionist_token):
 
 @pytest.fixture(scope="function")
 def owner(db_session, clinic):
-    from app.models.owner import Owner
+    from src.models.owner import Owner
     owner = Owner(
         clinic_id=clinic.id,
         name="Test Owner",
@@ -190,15 +190,14 @@ def owner(db_session, clinic):
 
 @pytest.fixture(scope="function")
 def pet(db_session, clinic, owner):
-    from app.models.pet import Pet
+    from src.models.pet import Pet
     from decimal import Decimal
     pet = Pet(
         clinic_id=clinic.id,
         owner_id=owner.id,
         name="Test Pet",
-        species="Cão",
+        species="CГЈo",
         breed="SRD",
-        age="3 years",
         weight=Decimal("10.5"),
         notes="Test pet",
     )
@@ -210,7 +209,7 @@ def pet(db_session, clinic, owner):
 
 @pytest.fixture(scope="function")
 def appointment(db_session, clinic, pet, vet_user):
-    from app.models.appointment import Appointment, AppointmentStatus
+    from src.models.appointment import Appointment, AppointmentStatus
     from datetime import datetime, timezone, timedelta
     appointment = Appointment(
         clinic_id=clinic.id,
@@ -231,7 +230,7 @@ def appointment(db_session, clinic, pet, vet_user):
 
 @pytest.fixture(scope="function")
 def treatment(db_session, clinic, appointment):
-    from app.models.treatment import Treatment
+    from src.models.treatment import Treatment
     treatment = Treatment(
         clinic_id=clinic.id,
         appointment_id=appointment.id,
@@ -247,7 +246,7 @@ def treatment(db_session, clinic, appointment):
 
 @pytest.fixture(scope="function")
 def invoice(db_session, clinic, owner, appointment):
-    from app.models.invoice import Invoice, InvoiceStatus
+    from src.models.invoice import Invoice, InvoiceStatus
     invoice = Invoice(
         clinic_id=clinic.id,
         owner_id=owner.id,

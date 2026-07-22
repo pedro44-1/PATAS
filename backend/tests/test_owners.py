@@ -1,4 +1,4 @@
-def test_list_owners_empty(client, vet_headers):
+﻿def test_list_owners_empty(client, vet_headers):
     response = client.get("/api/v1/owners/", headers=vet_headers)
     assert response.status_code == 200
     assert response.json() == []
@@ -61,8 +61,8 @@ def test_receptionist_can_create_owner(client, receptionist_headers):
 
 
 def test_owners_scoped_by_clinic(client, vet_headers, owner, db_session):
-    from app.models.clinic import Clinic
-    from app.models.owner import Owner
+    from src.models.clinic import Clinic
+    from src.models.owner import Owner
     other_clinic = Clinic(name="Other Clinic")
     db_session.add(other_clinic)
     db_session.commit()

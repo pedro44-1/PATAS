@@ -1,8 +1,8 @@
-"""
+﻿"""
 End-to-end integration test for the PATAS API.
 
-Runs the full API flow: register → login → CRUD owners/pets/appointments/treatments/invoices
-→ refresh token → permissions → logout.
+Runs the full API flow: register в†’ login в†’ CRUD owners/pets/appointments/treatments/invoices
+в†’ refresh token в†’ permissions в†’ logout.
 
 Set BASE_URL env var to test against a live Docker stack (e.g. http://localhost:8001).
 If unset, falls back to FastAPI TestClient with SQLite.
@@ -18,7 +18,7 @@ if BASE_URL:
     API_PREFIX = "/api/v1"
 else:
     from fastapi.testclient import TestClient
-    from app.main import app
+    from src.main import app
     client_factory = lambda: TestClient(app)
     API_PREFIX = "/api/v1"
 
@@ -45,7 +45,7 @@ def _email(suffix: str) -> str:
 
 
 class TestFullFlow:
-    """Runs the full API lifecycle: register → login → CRUD → logout."""
+    """Runs the full API lifecycle: register в†’ login в†’ CRUD в†’ logout."""
 
     def _register(self, api, suffix: str):
         """Register a new clinic + admin user. Returns the user dict."""
@@ -82,7 +82,7 @@ class TestFullFlow:
         assert resp.json()["email"] == _email("me")
 
     def test_03_full_crud(self, api):
-        """Complete CRUD flow: owner → pet → appointment → treatment → invoice."""
+        """Complete CRUD flow: owner в†’ pet в†’ appointment в†’ treatment в†’ invoice."""
         suffix = "crud"
         self._register(api, suffix)
         tokens = self._login(api, suffix)
@@ -90,13 +90,13 @@ class TestFullFlow:
 
         # Create owner
         owner_resp = api.post(_url("/owners/"), json={
-            "name": "João Teste",
+            "name": "JoГЈo Teste",
             "phone": "+244 900 111 222",
             "email": "joao.crud@test.ao",
         }, headers=h)
         assert owner_resp.status_code == 200, f"create owner: {owner_resp.text}"
         owner = owner_resp.json()
-        assert owner["name"] == "João Teste"
+        assert owner["name"] == "JoГЈo Teste"
         owner_id = owner["id"]
 
         # List owners
@@ -108,9 +108,8 @@ class TestFullFlow:
         pet_resp = api.post(_url("/pets/"), json={
             "owner_id": owner_id,
             "name": "Rex",
-            "species": "cão",
+            "species": "cГЈo",
             "breed": "Labrador",
-            "age": "3 anos",
             "weight": 28.5,
         }, headers=h)
         assert pet_resp.status_code == 200, f"create pet: {pet_resp.text}"
@@ -136,11 +135,11 @@ class TestFullFlow:
             "vet_id": vet_id,
             "scheduled_at": appt_time,
             "duration_min": 30,
-            "reason": "Vacinação anual",
+            "reason": "VacinaГ§ГЈo anual",
         }, headers=h)
         assert appt_resp.status_code == 200, f"create appointment: {appt_resp.text}"
         appt = appt_resp.json()
-        assert appt["reason"] == "Vacinação anual"
+        assert appt["reason"] == "VacinaГ§ГЈo anual"
         appt_id = appt["id"]
 
         # List appointments
@@ -151,13 +150,13 @@ class TestFullFlow:
         # Create treatment
         tx_resp = api.post(_url("/treatments/"), json={
             "appointment_id": appt_id,
-            "diagnosis": "Animal saudável",
+            "diagnosis": "Animal saudГЎvel",
             "prescription": "Regressar em 12 meses",
-            "notes": "Sem reações adversas",
+            "notes": "Sem reaГ§Гµes adversas",
         }, headers=h)
         assert tx_resp.status_code == 200, f"create treatment: {tx_resp.text}"
         tx = tx_resp.json()
-        assert tx["diagnosis"] == "Animal saudável"
+        assert tx["diagnosis"] == "Animal saudГЎvel"
         tx_id = tx["id"]
 
         # List treatments
@@ -170,7 +169,7 @@ class TestFullFlow:
             "owner_id": owner_id,
             "appointment_id": appt_id,
             "amount": 8500.0,
-            "description": "Vacinação + consulta",
+            "description": "VacinaГ§ГЈo + consulta",
         }, headers=h)
         assert inv_resp.status_code == 200, f"create invoice: {inv_resp.text}"
         inv = inv_resp.json()
@@ -251,7 +250,7 @@ class TestFullFlow:
         # Clinic A creates owner + pet + appointment
         owner_resp = api.post(_url("/owners/"), json={"name": "A Owner"}, headers=h_a)
         owner_id = owner_resp.json()["id"]
-        pet_resp = api.post(_url("/pets/"), json={"owner_id": owner_id, "name": "A Pet", "species": "cão"}, headers=h_a)
+        pet_resp = api.post(_url("/pets/"), json={"owner_id": owner_id, "name": "A Pet", "species": "cГЈo"}, headers=h_a)
         pet_id = pet_resp.json()["id"]
         users_resp = api.get(_url("/users/"), headers=h_a)
         vet_id = users_resp.json()[0]["id"]
@@ -261,12 +260,12 @@ class TestFullFlow:
         }, headers=h_a)
         appt_id = appt_resp.json()["id"]
 
-        # Clinic B lists owners — should be empty
+        # Clinic B lists owners вЂ” should be empty
         owners_b = api.get(_url("/owners/"), headers=h_b)
         assert owners_b.status_code == 200
         assert len(owners_b.json()) == 0, "Cross-tenant: clinic B should see no owners from clinic A"
 
-        # Clinic B tries to read clinic A's appointment — 404 (clinic-scoped)
+        # Clinic B tries to read clinic A's appointment вЂ” 404 (clinic-scoped)
         appt_b = api.get(_url(f"/appointments/{appt_id}"), headers=h_b)
         assert appt_b.status_code == 404
 

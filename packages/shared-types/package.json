@@ -1,0 +1,24 @@
+{
+  "name": "@patas/shared-types",
+  "version": "0.1.0",
+  "description": "Shared TypeScript types generated from backend Pydantic schemas",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./user": "./dist/user.js",
+    "./owner": "./dist/owner.js",
+    "./pet": "./dist/pet.js",
+    "./appointment": "./dist/appointment.js",
+    "./treatment": "./dist/treatment.js",
+    "./invoice": "./dist/invoice.js"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

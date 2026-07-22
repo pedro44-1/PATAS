@@ -1,4 +1,4 @@
-def test_list_invoices_empty(client, vet_headers):
+﻿def test_list_invoices_empty(client, vet_headers):
     response = client.get("/api/v1/invoices/", headers=vet_headers)
     assert response.status_code == 200
     assert response.json() == []
@@ -8,7 +8,7 @@ def test_create_invoice(client, vet_headers, owner):
     response = client.post("/api/v1/invoices/", headers=vet_headers, json={
         "owner_id": owner.id,
         "amount": 2500.0,
-        "description": "Consulta + Vacinação",
+        "description": "Consulta + VacinaГ§ГЈo",
     })
     assert response.status_code == 200
     data = response.json()
@@ -63,8 +63,8 @@ def test_receptionist_can_read_invoices(client, receptionist_headers, invoice):
 
 
 def test_invoices_scoped_by_clinic(client, vet_headers, invoice, db_session):
-    from app.models.clinic import Clinic
-    from app.models.invoice import Invoice
+    from src.models.clinic import Clinic
+    from src.models.invoice import Invoice
     other_clinic = Clinic(name="Other Clinic")
     db_session.add(other_clinic)
     db_session.commit()
