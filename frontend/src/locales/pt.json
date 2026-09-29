@@ -105,6 +105,7 @@
     "form": {
       "animal": "Animal",
       "selectAnimal": "Selecionar animal",
+      "createAnimal": "Registar novo animal",
       "vet": "Veterinário",
       "selectVet": "Selecionar veterinário",
       "dateTime": "Data e Hora",
@@ -117,6 +118,12 @@
       "duration": "Duração",
       "weight": "Peso registado (kg)",
       "weightPlaceholder": "Ex: 12.5"
+    },
+    "quickPet": {
+      "title": "Registo rápido de animal",
+      "hint": "Crie o animal sem perder os dados da consulta.",
+      "noOwners": "É necessário ter um dono registado para criar o animal.",
+      "create": "Registar e selecionar"
     },
     "table": {
       "time": "Hora",

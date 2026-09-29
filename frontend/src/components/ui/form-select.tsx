@@ -13,6 +13,7 @@ export interface FormSelectOption {
   value: string | number;
   label: ReactNode;
   disabled?: boolean;
+  variant?: "default" | "action";
 }
 
 interface FormSelectProps {
@@ -74,7 +75,11 @@ export function FormSelect({
             key={option.value}
             value={option.value}
             disabled={option.disabled}
-            className="px-3 py-2"
+            className={cn(
+              "px-3 py-2",
+              option.variant === "action" &&
+                "mt-1 border-t border-border pt-2.5 font-semibold text-brand-700 focus:text-brand-700",
+            )}
           >
             {option.label}
           </SelectItem>

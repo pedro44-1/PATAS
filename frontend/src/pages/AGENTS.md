@@ -21,6 +21,7 @@ Pages own screen composition, user-flow state, and route-level loading/error/emp
 - Receptionists may operate scheduling, arrival/call, owner/pet and invoice workflows but clinical content stays read-only; start/complete controls belong to vets/admins.
 - Admin user creation uses a temporary password without re-displaying or retaining it after a successful request.
 - Owner/pet removal is presented as archive; treatment/invoice physical deletion controls do not exist.
+- Appointment creation offers quick animal registration from the animal selector, preserves the appointment draft, and automatically selects the newly created animal.
 
 ## Work Guidance
 

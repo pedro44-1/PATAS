@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { appointmentsApi, Appointment, AppointmentCreate, VetOption } from "@/api/appointments";
-import { petsApi, Pet } from "@/api/pets";
+import { petsApi, Pet, PetCreate } from "@/api/pets";
+import { ownersApi, Owner } from "@/api/owners";
 import { serviceTypesApi } from "@/api/serviceTypes";
 import type { ServiceType } from "@patas/shared-types";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,9 @@ import { Plus, Search, CalendarDays, Check, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiErrorMessage } from "@/api/errors";
 
+const CREATE_PET_VALUE = "__create_pet__";
+const PET_SPECIES = ["Cão", "Gato", "Ave", "Roedor", "Coelho", "Réptil", "Outro"] as const;
+
 function statusConfig(status: string) {
   if (status === "in-progress")
     return { key: "in-progress", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
@@ -43,6 +47,7 @@ export default function Appointments() {
   const canWriteClinical = user?.role === "admin" || user?.role === "vet";
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
   const [vets, setVets] = useState<VetOption[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,12 +67,17 @@ export default function Appointments() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showQuickPet, setShowQuickPet] = useState(false);
+  const [savingPet, setSavingPet] = useState(false);
+  const [petError, setPetError] = useState("");
+  const [petForm, setPetForm] = useState<PetCreate>({ owner_id: 0, name: "", species: "Cão" });
 
   function load() {
-    Promise.all([appointmentsApi.list(filterDate), petsApi.list(), appointmentsApi.vets(), serviceTypesApi.list()])
-      .then(([apptsRes, petsRes, vetsRes, serviceTypesRes]) => {
+    Promise.all([appointmentsApi.list(filterDate), petsApi.list(), ownersApi.list(), appointmentsApi.vets(), serviceTypesApi.list()])
+      .then(([apptsRes, petsRes, ownersRes, vetsRes, serviceTypesRes]) => {
         setAppointments(apptsRes.data);
         setPets(petsRes.data);
+        setOwners(ownersRes.data);
         setVets(vetsRes.data);
         setServiceTypes(serviceTypesRes.data);
       })
@@ -89,6 +99,37 @@ export default function Appointments() {
       service_type_id: serviceTypes[0]?.id,
     });
     setShowForm(true);
+  }
+
+  function openQuickPet() {
+    setPetError("");
+    setPetForm({ owner_id: owners[0]?.id ?? 0, name: "", species: "Cão" });
+    setShowQuickPet(true);
+  }
+
+  function handlePetSelection(value: string) {
+    if (value === CREATE_PET_VALUE) {
+      openQuickPet();
+      return;
+    }
+    setForm({ ...form, pet_id: Number(value) });
+  }
+
+  async function handleQuickPetSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingPet(true);
+    setPetError("");
+    try {
+      const response = await petsApi.create(petForm);
+      const createdPet = response.data;
+      setPets((current) => [...current, createdPet]);
+      setForm((current) => ({ ...current, pet_id: createdPet.id }));
+      setShowQuickPet(false);
+    } catch (requestError: unknown) {
+      setPetError(apiErrorMessage(requestError, t, "pets.error"));
+    } finally {
+      setSavingPet(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -297,10 +338,23 @@ export default function Appointments() {
                 <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.animal")} *</Label>
                 <FormSelect
                   value={form.pet_id || null}
-                  onValueChange={(value) => setForm({ ...form, pet_id: Number(value) })}
-                  options={pets.map((pet) => ({ value: pet.id, label: pet.name }))}
+                  onValueChange={handlePetSelection}
+                  options={[
+                    ...pets.map((pet) => ({ value: pet.id, label: pet.name })),
+                    {
+                      value: CREATE_PET_VALUE,
+                      label: (
+                        <span className="flex items-center gap-2">
+                          <Plus className="size-4" />
+                          {t("appointments.form.createAnimal")}
+                        </span>
+                      ),
+                      variant: "action" as const,
+                    },
+                  ]}
                   placeholder={t("appointments.form.selectAnimal")}
                   className="h-11 border-dark-200 bg-white"
+                  ariaLabel={t("appointments.form.animal")}
                   required
                 />
               </div>
@@ -416,6 +470,90 @@ export default function Appointments() {
           </div>
         </div>,
         document.body
+      )}
+      {showQuickPet && createPortal(
+        <div
+          className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-black/45 p-4 backdrop-blur-sm"
+          onClick={() => setShowQuickPet(false)}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-dark-100 px-6 py-4">
+              <div>
+                <h2 className="font-bold text-dark-900">{t("appointments.quickPet.title")}</h2>
+                <p className="mt-0.5 text-xs text-dark-400">{t("appointments.quickPet.hint")}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickPet(false)}
+                aria-label={t("common.close")}
+                className="flex size-8 items-center justify-center rounded-xl bg-dark-100 text-dark-400 transition-colors hover:bg-dark-200 hover:text-dark-700"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <form onSubmit={handleQuickPetSubmit}>
+              <div className="space-y-4 px-6 py-5">
+                {petError && (
+                  <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {petError}
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.owner")} *</Label>
+                  <FormSelect
+                    value={petForm.owner_id || null}
+                    onValueChange={(value) => setPetForm({ ...petForm, owner_id: Number(value) })}
+                    options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
+                    placeholder={t("pets.form.selectOwner")}
+                    className="h-11 border-dark-200 bg-white"
+                    required
+                  />
+                  {owners.length === 0 && (
+                    <p className="text-xs text-amber-700">{t("appointments.quickPet.noOwners")}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-pet-name" className="text-xs font-semibold text-dark-600">{t("pets.form.name")} *</Label>
+                  <Input
+                    id="quick-pet-name"
+                    value={petForm.name}
+                    onChange={(event) => setPetForm({ ...petForm, name: event.target.value })}
+                    placeholder={t("pets.form.namePlaceholder")}
+                    className="h-11 rounded-xl"
+                    autoFocus
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.species")} *</Label>
+                  <FormSelect
+                    value={petForm.species}
+                    onValueChange={(value) => setPetForm({ ...petForm, species: value })}
+                    options={PET_SPECIES.map((species) => ({ value: species, label: t(`pets.species.${species}`) }))}
+                    className="h-11 border-dark-200 bg-white"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-dark-100 px-6 py-4">
+                <Button type="button" variant="outline" onClick={() => setShowQuickPet(false)} className="h-11 rounded-xl">
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingPet || owners.length === 0}
+                  className="h-11 rounded-xl bg-brand-600 font-semibold hover:bg-brand-700"
+                >
+                  {savingPet ? t("common.saving") : t("appointments.quickPet.create")}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
