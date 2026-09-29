@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ownersApi, Owner, OwnerCreate } from "@/api/owners";
+import { apiErrorMessage } from "@/api/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,9 +15,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Phone, Mail, MapPin, Search, X } from "lucide-react";
+import { Archive, Plus, Pencil, Phone, Mail, MapPin, Search, X } from "lucide-react";
 
 export default function Owners() {
+  const { t } = useTranslation();
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -29,6 +32,7 @@ export default function Owners() {
   });
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   function load() {
     setLoading(true);
@@ -65,6 +69,7 @@ export default function Owners() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
       if (editing) {
         await ownersApi.update(editing.id, form);
@@ -73,34 +78,37 @@ export default function Owners() {
       }
       setShowForm(false);
       load();
-    } catch {} finally {
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "owners.error"));
+    } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Eliminar este dono?")) return;
-    await ownersApi.delete(id);
-    load();
+    if (!confirm(t("owners.archiveConfirm"))) return;
+    try {
+      await ownersApi.delete(id);
+      load();
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "owners.error"));
+    }
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-dark-900">Donos</h2>
-          <p className="text-dark-400 text-sm mt-0.5">
-            {owners.length} dono{owners.length !== 1 ? "s" : ""} registado
-            {owners.length !== 1 ? "s" : ""}
-          </p>
+          <h2 className="text-2xl font-extrabold text-dark-900">{t("owners.title")}</h2>
+          <p className="text-dark-400 text-sm mt-0.5">{t("owners.count", { count: owners.length })}</p>
         </div>
         <Button
           onClick={openCreate}
           className="bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Novo Dono
+          {t("owners.new")}
         </Button>
       </div>
 
@@ -108,12 +116,13 @@ export default function Owners() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
         <Input
-          placeholder="Pesquisar por nome, email ou telefone..."
+          placeholder={t("owners.search")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 h-11 rounded-xl bg-white border-dark-200"
         />
       </div>
+      {error && <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
       {/* Table */}
       <Card>
@@ -124,13 +133,13 @@ export default function Owners() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-dark-400">
-              <p className="text-sm font-medium">Nenhum dono encontrado</p>
+              <p className="text-sm font-medium">{t("owners.noResults")}</p>
               {search && (
                 <button
                   onClick={() => setSearch("")}
                   className="mt-2 text-xs text-brand-600 hover:text-brand-700 font-semibold"
                 >
-                  Limpar pesquisa
+                  {t("owners.clearSearch")}
                 </button>
               )}
             </div>
@@ -138,11 +147,11 @@ export default function Owners() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-dark-100">
-                  <TableHead className="pl-5">Nome</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Endereço</TableHead>
-                  <TableHead className="pr-5 w-36 text-right">Ações</TableHead>
+                  <TableHead className="pl-5">{t("owners.table.name")}</TableHead>
+                  <TableHead>{t("owners.table.phone")}</TableHead>
+                  <TableHead>{t("owners.table.email")}</TableHead>
+                  <TableHead>{t("owners.table.address")}</TableHead>
+                  <TableHead className="pr-5 w-36 text-right">{t("owners.table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -192,8 +201,9 @@ export default function Owners() {
                         <button
                           onClick={() => handleDelete(o.id)}
                           className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                          aria-label={t("common.archive")}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Archive className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </TableCell>
@@ -219,10 +229,10 @@ export default function Owners() {
             <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <div>
                 <h2 className="font-bold text-dark-900">
-                  {editing ? "Editar Dono" : "Novo Dono"}
+                  {t(editing ? "owners.edit" : "owners.new")}
                 </h2>
                 <p className="text-dark-400 text-xs mt-0.5">
-                  {editing ? `A editar ${editing.name}` : "Registar um novo dono"}
+                  {editing ? t("owners.editing", { name: editing.name }) : t("owners.createHint")}
                 </p>
               </div>
               <button
@@ -236,49 +246,49 @@ export default function Owners() {
             {/* Modal body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Nome *</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.name")} *</Label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Nome completo"
+                  placeholder={t("owners.form.name")}
                   required
                   className="h-11 rounded-xl"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Telefone</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.phone")}</Label>
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="+244 923 456 789"
+                  placeholder={t("owners.form.phonePlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Email</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.email")}</Label>
                 <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="email@exemplo.com"
+                  placeholder={t("owners.form.emailPlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Endereço</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.address")}</Label>
                 <Input
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  placeholder="Rua, número, bairro"
+                  placeholder={t("owners.form.addressPlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Notas</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.notes")}</Label>
                 <Input
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Notas adicionais"
+                  placeholder={t("owners.form.notesPlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
@@ -291,7 +301,7 @@ export default function Owners() {
                   onClick={() => setShowForm(false)}
                   className="rounded-xl h-11"
                 >
-                  Cancelar
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -301,12 +311,12 @@ export default function Owners() {
                   {saving ? (
                     <span className="flex items-center gap-2">
                       <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      A guardar...
+                      {t("common.saving")}
                     </span>
                   ) : editing ? (
-                    "Guardar Alterações"
+                    t("owners.saveChanges")
                   ) : (
-                    "Criar Dono"
+                    t("owners.create")
                   )}
                 </Button>
               </div>

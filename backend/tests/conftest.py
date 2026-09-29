@@ -1,16 +1,18 @@
-﻿import os
+import os
+
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 
+
+from datetime import UTC
+
+import fakeredis.aioredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import fakeredis.aioredis
-
-from src.core.database import get_db, Base
+from src.core.database import Base, get_db
 from src.core.security import hash_password
 from src.models import *
 from src.services.cache import cache as cache_service
@@ -81,7 +83,6 @@ def seed_permission_data(setup_database):
 
 @pytest.fixture(scope="function")
 def db_session():
-    from src.main import app
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
@@ -190,13 +191,14 @@ def owner(db_session, clinic):
 
 @pytest.fixture(scope="function")
 def pet(db_session, clinic, owner):
-    from src.models.pet import Pet
     from decimal import Decimal
+
+    from src.models.pet import Pet
     pet = Pet(
         clinic_id=clinic.id,
         owner_id=owner.id,
         name="Test Pet",
-        species="CГЈo",
+        species="Cão",
         breed="SRD",
         weight=Decimal("10.5"),
         notes="Test pet",
@@ -209,14 +211,15 @@ def pet(db_session, clinic, owner):
 
 @pytest.fixture(scope="function")
 def appointment(db_session, clinic, pet, vet_user):
+    from datetime import datetime, timedelta
+
     from src.models.appointment import Appointment, AppointmentStatus
-    from datetime import datetime, timezone, timedelta
     appointment = Appointment(
         clinic_id=clinic.id,
         pet_id=pet.id,
         vet_id=vet_user.id,
         owner_id=pet.owner_id,
-        scheduled_at=datetime.now(timezone.utc) + timedelta(days=1),
+        scheduled_at=datetime.now(UTC) + timedelta(days=1),
         duration_min=30,
         status=AppointmentStatus.SCHEDULED,
         reason="Test appointment",

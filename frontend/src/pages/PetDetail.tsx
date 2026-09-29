@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
-import { petsApi, Pet } from "@/api/pets";
+import { petsApi, Pet, PetHistoryAppointment } from "@/api/pets";
 import { ownersApi, Owner } from "@/api/owners";
-import { appointmentsApi, Appointment } from "@/api/appointments";
-import { treatmentsApi, Treatment } from "@/api/treatments";
+import { Appointment } from "@/api/appointments";
+import { Treatment } from "@/api/treatments";
+import { Medication, Vaccination } from "@/api/clinical";
 import { invoicesApi, Invoice } from "@/api/invoices";
+import { useAuth } from "@/contexts/AuthContext";
+import ClinicalHistory from "@/features/pets/ClinicalHistory";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,12 +20,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { parseApiDate } from "@/lib/date";
 import {
   ArrowLeft,
   PawPrint,
   Scale,
   CalendarDays,
   Pill,
+  Syringe,
   FileText,
   Phone,
   Mail,
@@ -30,41 +36,48 @@ import {
   Stethoscope,
   TrendingUp,
   AlertCircle,
+  ClipboardCheck,
   Minus,
 } from "lucide-react";
 
-function calculateAge(birthDate: string | null): string {
+function calculateAge(birthDate: string | null, t: (key: string, options?: Record<string, unknown>) => string): string {
   if (!birthDate) return "—";
   const birth = new Date(birthDate);
   const today = new Date();
   const totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
-  if (totalMonths < 1) return "< 1 mês";
-  if (totalMonths < 12) return `${totalMonths} mê${totalMonths !== 1 ? "ses" : "s"}`;
+  if (totalMonths < 1) return t("pets.age.lessThanMonth");
+  if (totalMonths < 12) return t("pets.age.months", { count: totalMonths });
   const years = Math.floor(totalMonths / 12);
-  if (years === 1) return "1 ano";
-  return `${years} anos`;
+  return t("pets.age.years", { count: years });
 }
 
 function statusConfig(status: string) {
+  if (status === "in-progress")
+    return { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
   if (status === "completed")
-    return { label: "Concluída", bg: "bg-brand-50", text: "text-brand-700", dot: "bg-brand-500" };
+    return { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
   if (status === "cancelled")
-    return { label: "Cancelada", bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
-  return { label: "Agendada", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
+    return { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
+  if (status === "no-show")
+    return { bg: "bg-dark-100", text: "text-dark-600", dot: "bg-dark-400" };
+  return { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
 }
 
 function invStatusConfig(status: string) {
+  if (status === "sent")
+    return { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
   if (status === "paid")
-    return { label: "Paga", bg: "bg-brand-50", text: "text-brand-700", dot: "bg-brand-500" };
+    return { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
   if (status === "cancelled")
-    return { label: "Cancelada", bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
-  return { label: "Rascunho", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
+    return { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
+  return { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
 }
 
-type Tab = "appointments" | "weight" | "diagnostics" | "treatments" | "invoices";
+type Tab = "timeline" | "vaccinations" | "medications" | "appointments" | "weight" | "diagnostics" | "treatments" | "invoices";
 
 // ─── SVG Weight Chart ───────────────────────────────────────────────────────────
 function WeightChart({ appointments }: { appointments: Appointment[] }) {
+  const { t } = useTranslation();
   const withWeight = appointments
     .filter((a) => a.weight != null)
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
@@ -73,8 +86,8 @@ function WeightChart({ appointments }: { appointments: Appointment[] }) {
     return (
       <div className="flex flex-col items-center py-16 text-dark-400">
         <Scale className="w-10 h-10 mb-3 opacity-30" />
-        <p className="text-sm font-medium">Nenhum registo de peso encontrado</p>
-        <p className="text-dark-400 text-xs mt-1">O peso é registado nas consultas</p>
+        <p className="text-sm font-medium">{t("pets.detail.weight.noData")}</p>
+        <p className="text-dark-400 text-xs mt-1">{t("pets.detail.weight.noDataHint")}</p>
       </div>
     );
   }
@@ -108,7 +121,7 @@ function WeightChart({ appointments }: { appointments: Appointment[] }) {
           <div key={a.id} className="flex flex-col items-center gap-0.5">
             <span className="text-brand-700 font-bold text-sm">{a.weight!.toFixed(1)} kg</span>
             <span className="text-dark-400 text-[10px]">
-              {new Date(a.scheduled_at).toLocaleDateString("pt-AO", { day: "2-digit", month: "short" })}
+              {parseApiDate(a.scheduled_at).toLocaleDateString("pt-AO", { day: "2-digit", month: "short", timeZone: "Africa/Luanda" })}
             </span>
           </div>
         ))}
@@ -144,7 +157,7 @@ function WeightChart({ appointments }: { appointments: Appointment[] }) {
       <div className="flex items-center gap-6 px-2">
         <div className="flex items-center gap-2 text-xs text-dark-400">
           <span className="font-semibold text-brand-700">{weights[weights.length - 1].toFixed(1)} kg</span>
-          <span>último peso</span>
+          <span>{t("pets.detail.weight.lastWeight")}</span>
         </div>
         {weights.length > 1 && (
           <div className="flex items-center gap-2 text-xs text-dark-400">
@@ -154,7 +167,7 @@ function WeightChart({ appointments }: { appointments: Appointment[] }) {
             <span className="font-semibold">
               {Math.abs(weights[weights.length - 1] - weights[0]).toFixed(1)} kg
             </span>
-            <span>variação total</span>
+            <span>{t("pets.detail.weight.totalVariation")}</span>
           </div>
         )}
       </div>
@@ -165,35 +178,55 @@ function WeightChart({ appointments }: { appointments: Appointment[] }) {
 export default function PetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { t } = useTranslation();
   const petId = Number(id);
 
   const [pet, setPet] = useState<Pet | null>(null);
   const [owner, setOwner] = useState<Owner | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
+  const [vaccinations, setVaccinations] = useState<Vaccination[]>([]);
+  const [medications, setMedications] = useState<Medication[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>("appointments");
+  const [activeTab, setActiveTab] = useState<Tab>("timeline");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!petId) return;
     Promise.all([
       petsApi.get(petId),
-      ownersApi.list(),
-      appointmentsApi.list(),
-      treatmentsApi.list(),
+      ownersApi.list(true),
+      petsApi.history(petId),
       invoicesApi.list(),
     ])
-      .then(([petRes, ownersRes, apptsRes, treatRes, invRes]) => {
+      .then(([petRes, ownersRes, historyRes, invRes]) => {
         setPet(petRes.data);
         const o = ownersRes.data.find((x: Owner) => x.id === petRes.data.owner_id);
         setOwner(o ?? null);
-        const petAppts = apptsRes.data.filter((a: Appointment) => a.pet_id === petId);
+        const petAppts = historyRes.data.appointments.map((a: PetHistoryAppointment) => ({
+          id: a.id,
+          clinic_id: petRes.data.clinic_id,
+          pet_id: petId,
+          vet_id: a.vet_id,
+          owner_id: petRes.data.owner_id,
+          scheduled_at: a.scheduled_at,
+          duration_min: 30,
+          status: a.status,
+          status_reason: a.status_reason,
+          reason: a.reason,
+          notes: a.notes,
+          weight: a.weight,
+          service_type_id: a.service_type_id,
+          created_at: a.scheduled_at,
+        }));
         setAppointments(petAppts);
-        const petTreats = treatRes.data.filter((t: Treatment) =>
-          petAppts.some((a) => a.id === t.appointment_id)
-        );
+        const petTreats = historyRes.data.appointments
+          .filter((a: PetHistoryAppointment) => a.treatment)
+          .map((a: PetHistoryAppointment) => ({ ...a.treatment!, appointment_id: a.id, clinic_id: petRes.data.clinic_id }));
         setTreatments(petTreats);
+        setVaccinations(historyRes.data.vaccinations ?? []);
+        setMedications(historyRes.data.medications ?? []);
         const petInvs = invRes.data.filter((i: Invoice) => i.owner_id === petRes.data.owner_id);
         setInvoices(petInvs);
       })
@@ -205,7 +238,7 @@ export default function PetDetail() {
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3 text-dark-400">
           <div className="w-8 h-8 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin" />
-          <p className="text-sm">A carregar...</p>
+          <p className="text-sm">{t("common.loading")}</p>
         </div>
       </div>
     );
@@ -214,15 +247,15 @@ export default function PetDetail() {
   if (!pet) {
     return (
       <div className="text-center py-16 text-dark-400">
-        <p>Animal não encontrado.</p>
+        <p>{t("pets.detail.notFound")}</p>
         <button onClick={() => navigate("/pets")} className="mt-2 text-brand-600 hover:text-brand-700 text-sm font-semibold">
-          Voltar à lista
+          {t("pets.detail.backToList")}
         </button>
       </div>
     );
   }
 
-  const age = calculateAge(pet.birth_date);
+  const age = calculateAge(pet.birth_date, t);
   const speciesEmoji =
     pet.species === "Cão" ? "🐶"
     : pet.species === "Gato" ? "🐱"
@@ -235,11 +268,14 @@ export default function PetDetail() {
   const petTreatments = treatments;
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode; count: number }[] = [
-    { key: "appointments", label: "Consultas", icon: <CalendarDays className="w-4 h-4" />, count: appointments.length },
-    { key: "weight", label: "Peso", icon: <Scale className="w-4 h-4" />, count: appointmentsWithWeight.length },
-    { key: "diagnostics", label: "Diagnósticos", icon: <Stethoscope className="w-4 h-4" />, count: petTreatments.length },
-    { key: "treatments", label: "Tratamentos", icon: <Pill className="w-4 h-4" />, count: petTreatments.length },
-    { key: "invoices", label: "Faturas", icon: <FileText className="w-4 h-4" />, count: invoices.length },
+    { key: "timeline", label: t("clinical.timeline.title"), icon: <FileText className="w-4 h-4" />, count: appointments.length + petTreatments.length + vaccinations.length + medications.length },
+    { key: "vaccinations", label: t("clinical.vaccinations.title"), icon: <Syringe className="w-4 h-4" />, count: vaccinations.filter((item) => item.status !== "voided").length },
+    { key: "medications", label: t("clinical.medications.title"), icon: <Pill className="w-4 h-4" />, count: medications.filter((item) => item.status !== "voided").length },
+    { key: "appointments", label: t("pets.detail.tabs.appointments"), icon: <CalendarDays className="w-4 h-4" />, count: appointments.length },
+    { key: "weight", label: t("pets.detail.tabs.weight"), icon: <Scale className="w-4 h-4" />, count: appointmentsWithWeight.length },
+    { key: "diagnostics", label: t("pets.detail.tabs.diagnostics"), icon: <Stethoscope className="w-4 h-4" />, count: petTreatments.length },
+    { key: "treatments", label: t("pets.detail.tabs.treatments"), icon: <Pill className="w-4 h-4" />, count: petTreatments.length },
+    { key: "invoices", label: t("pets.detail.tabs.invoices"), icon: <FileText className="w-4 h-4" />, count: invoices.length },
   ];
 
   return (
@@ -251,7 +287,7 @@ export default function PetDetail() {
           className="flex items-center gap-2 text-dark-400 hover:text-dark-900 transition-colors text-sm font-medium mt-1"
         >
           <ArrowLeft className="w-4 h-4" />
-          Voltar
+          {t("common.back")}
         </button>
       </div>
 
@@ -259,7 +295,7 @@ export default function PetDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardContent className="p-6">
-            <div className="flex items-start gap-5">
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:gap-5">
               <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center text-3xl flex-shrink-0">
                 {speciesEmoji}
               </div>
@@ -268,12 +304,13 @@ export default function PetDetail() {
                   <h2 className="text-2xl font-extrabold text-dark-900">{pet.name}</h2>
                   <Badge variant="outline" className="text-xs font-medium">{pet.species}</Badge>
                   {pet.breed && <Badge variant="outline" className="text-xs">{pet.breed}</Badge>}
+                  {pet.archived_at && <Badge variant="destructive" className="text-xs">{t("common.archived")}</Badge>}
                 </div>
                 <div className="flex flex-wrap gap-4 mt-3">
                   {pet.birth_date && (
                     <span className="flex items-center gap-1.5 text-sm text-dark-500">
                       <CalendarDays className="w-3.5 h-3.5" />
-                      {age} · nasc. {new Date(pet.birth_date).toLocaleDateString("pt-AO")}
+                      {age} · {t("pets.form.birthDateFormatted", { date: new Date(pet.birth_date).toLocaleDateString("pt-AO") })}
                     </span>
                   )}
                   {latestWeight && (
@@ -297,17 +334,17 @@ export default function PetDetail() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <User className="w-4 h-4 text-dark-500" />
-                <p className="text-dark-500 text-xs font-semibold uppercase tracking-widest">Dono</p>
+                <p className="text-dark-500 text-xs font-semibold uppercase tracking-widest">{t("pets.form.owner")}</p>
               </div>
               <h3 className="text-dark-100 font-bold text-base">{owner.name}</h3>
               {owner.phone && (
-                <a href={`tel:${owner.phone}`} className="flex items-center gap-1.5 text-dark-400 text-sm mt-2 hover:text-brand-400 transition-colors">
+                <a href={`tel:${owner.phone}`} className="flex items-center gap-1.5 text-dark-400 text-sm mt-2 hover:text-brand-600 transition-colors">
                   <Phone className="w-3.5 h-3.5" />
                   {owner.phone}
                 </a>
               )}
               {owner.email && (
-                <a href={`mailto:${owner.email}`} className="flex items-center gap-1.5 text-dark-400 text-sm mt-1 hover:text-brand-400 transition-colors">
+                <a href={`mailto:${owner.email}`} className="flex items-center gap-1.5 text-dark-400 text-sm mt-1 hover:text-brand-600 transition-colors">
                   <Mail className="w-3.5 h-3.5" />
                   {owner.email}
                 </a>
@@ -351,23 +388,41 @@ export default function PetDetail() {
       </div>
 
       {/* ── Appointments tab ── */}
+      {(activeTab === "timeline" || activeTab === "vaccinations" || activeTab === "medications") && (
+        <ClinicalHistory
+          petId={petId}
+          activeTab={activeTab}
+          appointments={appointments}
+          treatments={petTreatments}
+          vaccinations={vaccinations}
+          medications={medications}
+          currentUser={user}
+          onRecordsChange={(nextVaccinations, nextMedications) => {
+            setVaccinations(nextVaccinations);
+            setMedications(nextMedications);
+          }}
+        />
+      )}
+
+      {/* ── Appointments tab ── */}
       {activeTab === "appointments" && (
         <Card>
           <CardContent className="p-0">
             {appointments.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-dark-400">
                 <CalendarDays className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm font-medium">Nenhuma consulta registada</p>
+                <p className="text-sm font-medium">{t("pets.detail.appointments.noData")}</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-dark-100">
-                    <TableHead className="pl-5">Data</TableHead>
-                    <TableHead>Motivo</TableHead>
-                    <TableHead>Peso</TableHead>
-                    <TableHead>Notas</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead className="pl-5">{t("invoices.table.date")}</TableHead>
+                    <TableHead>{t("appointments.table.reason")}</TableHead>
+                    <TableHead>{t("appointments.form.weight")}</TableHead>
+                    <TableHead>{t("appointments.form.notes")}</TableHead>
+                    <TableHead>{t("appointments.table.status")}</TableHead>
+                    <TableHead className="pr-5 text-right">{t("pets.detail.appointments.encounter")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -377,14 +432,14 @@ export default function PetDetail() {
                       <TableRow key={a.id}>
                         <TableCell className="pl-5">
                           <div className="font-semibold text-sm text-dark-900">
-                            {new Date(a.scheduled_at).toLocaleDateString("pt-AO")}
+                            {parseApiDate(a.scheduled_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" })}
                           </div>
                           <div className="text-dark-400 text-xs">
-                            {new Date(a.scheduled_at).toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit" })}
+                            {parseApiDate(a.scheduled_at).toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Luanda" })}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium text-sm text-dark-700">{a.reason ?? "Consulta"}</span>
+                          <span className="font-medium text-sm text-dark-700">{a.reason ?? t("dashboard.defaultReason")}</span>
                         </TableCell>
                         <TableCell>
                           {a.weight ? (
@@ -405,8 +460,14 @@ export default function PetDetail() {
                         <TableCell>
                           <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold", cfg.bg, cfg.text)}>
                             <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
-                            {cfg.label}
+                            {t(`appointments.status.${a.status}`)}
                           </span>
+                        </TableCell>
+                        <TableCell className="pr-5 text-right">
+                          <button onClick={() => navigate(`/appointments/${a.id}/clinical`)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/5">
+                            <ClipboardCheck className="size-3.5" />
+                            {t("clinicalAppointment.openEncounter")}
+                          </button>
                         </TableCell>
                       </TableRow>
                     );
@@ -423,8 +484,8 @@ export default function PetDetail() {
         <Card>
           <CardContent className="p-6">
             <div className="mb-4">
-              <h3 className="text-base font-bold text-dark-900">Histórico de Peso</h3>
-              <p className="text-dark-400 text-xs mt-0.5">Evolução do peso ao longo das consultas</p>
+              <h3 className="text-base font-bold text-dark-900">{t("pets.detail.weight.history")}</h3>
+              <p className="text-dark-400 text-xs mt-0.5">{t("pets.detail.weight.subtitle")}</p>
             </div>
             <WeightChart appointments={appointments} />
           </CardContent>
@@ -438,15 +499,15 @@ export default function PetDetail() {
             {petTreatments.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-dark-400">
                 <Stethoscope className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm font-medium">Nenhum diagnóstico registado</p>
-                <p className="text-dark-400 text-xs mt-1">Os diagnósticos são registados após as consultas</p>
+                <p className="text-sm font-medium">{t("pets.detail.diagnostics.noData")}</p>
+                <p className="text-dark-400 text-xs mt-1">{t("pets.detail.diagnostics.noDataHint")}</p>
               </div>
             ) : (
               <div className="divide-y divide-dark-100">
-                {petTreatments.map((t) => {
-                  const appt = appointments.find((a) => a.id === t.appointment_id);
+                {petTreatments.map((treatment) => {
+                  const appt = appointments.find((a) => a.id === treatment.appointment_id);
                   return (
-                    <div key={t.id} className="p-5">
+                    <div key={treatment.id} className="p-5">
                       <div className="flex items-start gap-4">
                         <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <AlertCircle className="w-4 h-4 text-amber-600" />
@@ -454,21 +515,21 @@ export default function PetDetail() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 flex-wrap mb-1">
                             <h4 className="font-bold text-dark-900 text-sm">
-                              {t.diagnosis ?? "Diagnóstico não especificado"}
+                              {treatment.diagnosis ?? t("pets.detail.diagnostics.unspecified")}
                             </h4>
                             {appt && (
                               <span className="text-dark-400 text-xs">
-                                {new Date(appt.scheduled_at).toLocaleDateString("pt-AO")}
+                                {parseApiDate(appt.scheduled_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" })}
                               </span>
                             )}
                           </div>
-                          {t.notes && (
-                            <p className="text-dark-500 text-sm mt-1">{t.notes}</p>
+                          {treatment.notes && (
+                            <p className="text-dark-500 text-sm mt-1">{treatment.notes}</p>
                           )}
-                          {t.prescription && (
+                          {treatment.prescription && (
                             <div className="mt-2 bg-brand-50 border border-brand-200 rounded-lg px-3 py-2">
-                              <p className="text-brand-700 text-xs font-semibold mb-0.5">Prescrição:</p>
-                              <p className="text-brand-600 text-xs">{t.prescription}</p>
+                              <p className="text-brand-700 text-xs font-semibold mb-0.5">{t("pets.detail.diagnostics.prescription")}:</p>
+                              <p className="text-brand-600 text-xs">{treatment.prescription}</p>
                             </div>
                           )}
                         </div>
@@ -489,28 +550,28 @@ export default function PetDetail() {
             {petTreatments.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-dark-400">
                 <Pill className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm font-medium">Nenhum tratamento registado</p>
+                <p className="text-sm font-medium">{t("pets.detail.treatments.noData")}</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-dark-100">
-                    <TableHead className="pl-5 w-28">Data</TableHead>
-                    <TableHead>Diagnóstico</TableHead>
-                    <TableHead>Prescrição</TableHead>
+                    <TableHead className="pl-5 w-28">{t("invoices.table.date")}</TableHead>
+                    <TableHead>{t("pets.detail.tabs.diagnostics")}</TableHead>
+                    <TableHead>{t("pets.detail.diagnostics.prescription")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {petTreatments.map((t) => (
-                    <TableRow key={t.id}>
+                  {petTreatments.map((treatment) => (
+                    <TableRow key={treatment.id}>
                       <TableCell className="pl-5 font-medium text-sm text-dark-700">
-                        {new Date(t.created_at).toLocaleDateString("pt-AO")}
+                        {parseApiDate(treatment.created_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" })}
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-dark-600">{t.diagnosis ?? "—"}</span>
+                        <span className="text-sm text-dark-600">{treatment.diagnosis ?? "—"}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-dark-500">{t.prescription ?? "—"}</span>
+                        <span className="text-sm text-dark-500">{treatment.prescription ?? "—"}</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -528,17 +589,17 @@ export default function PetDetail() {
             {invoices.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-dark-400">
                 <FileText className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm font-medium">Nenhuma fatura registada</p>
+                <p className="text-sm font-medium">{t("pets.detail.invoices.noData")}</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-dark-100">
-                    <TableHead className="pl-5 w-16">Nº</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="pr-5">Data</TableHead>
+                    <TableHead className="pl-5 w-16">{t("invoices.table.number")}</TableHead>
+                    <TableHead>{t("invoices.table.description")}</TableHead>
+                    <TableHead>{t("invoices.table.value")}</TableHead>
+                    <TableHead>{t("invoices.table.status")}</TableHead>
+                    <TableHead className="pr-5">{t("invoices.table.date")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -556,11 +617,11 @@ export default function PetDetail() {
                         <TableCell>
                           <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold", cfg.bg, cfg.text)}>
                             <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
-                            {cfg.label}
+                            {t(`invoices.status.${inv.status}`)}
                           </span>
                         </TableCell>
                         <TableCell className="pr-5 text-sm text-dark-500">
-                          {new Date(inv.created_at).toLocaleDateString("pt-AO")}
+                          {parseApiDate(inv.created_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" })}
                         </TableCell>
                       </TableRow>
                     );

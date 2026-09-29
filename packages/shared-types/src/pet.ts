@@ -38,5 +38,7 @@ export interface PetResponse {
   birth_date: string | null;
   weight: number | null;
   notes: string | null;
+  archived_at: string | null;
+  archived_by_user_id: number | null;
   created_at: string; // ISO datetime
 }

@@ -5,12 +5,18 @@ export interface TreatmentCreate {
   diagnosis?: string;
   notes?: string;
   prescription?: string;
+  anamnesis?: string;
+  consultation_type?: string;
+  referring_vet_id?: number;
 }
 
 export interface TreatmentUpdate {
   diagnosis?: string;
   notes?: string;
   prescription?: string;
+  anamnesis?: string;
+  consultation_type?: string;
+  referring_vet_id?: number;
 }
 
 export interface TreatmentResponse {
@@ -20,5 +26,9 @@ export interface TreatmentResponse {
   diagnosis: string | null;
   notes: string | null;
   prescription: string | null;
+  anamnesis: string | null;
+  consultation_type: string;
+  referring_vet_id: number | null;
   created_at: string; // ISO datetime
+  updated_at: string | null;
 }

@@ -1,5 +1,6 @@
-﻿from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
-from datetime import datetime, timezone
+﻿from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 
 from src.core.database import Base
 
@@ -15,4 +16,4 @@ class AuditLog(Base):
     resource_id = Column(Integer, nullable=True)
     details = Column(Text, nullable=True)
     ip_address = Column(String(45), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), index=True)

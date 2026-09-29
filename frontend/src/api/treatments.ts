@@ -7,7 +7,11 @@ export interface Treatment {
   diagnosis: string | null;
   notes: string | null;
   prescription: string | null;
+  anamnesis: string | null;
+  consultation_type: string;
+  referring_vet_id: number | null;
   created_at: string;
+  updated_at: string | null;
 }
 
 export interface TreatmentCreate {
@@ -15,6 +19,9 @@ export interface TreatmentCreate {
   diagnosis?: string;
   notes?: string;
   prescription?: string;
+  anamnesis?: string;
+  consultation_type?: string;
+  referring_vet_id?: number;
 }
 
 export const treatmentsApi = {
@@ -24,6 +31,4 @@ export const treatmentsApi = {
     api.post<Treatment>("/treatments/", data),
   update: (id: number, data: Partial<TreatmentCreate>) =>
     api.patch<Treatment>(`/treatments/${id}`, data),
-  delete: (id: number) =>
-    api.delete(`/treatments/${id}`),
 };

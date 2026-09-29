@@ -1,6 +1,5 @@
 ﻿import json
-import time
-from typing import Optional, Any
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -9,7 +8,7 @@ from src.core.config import settings
 
 class CacheService:
     def __init__(self, redis_url: str):
-        self._redis: Optional[aioredis.Redis] = None
+        self._redis: aioredis.Redis | None = None
         self._redis_url = redis_url
 
     async def init(self):
@@ -35,7 +34,7 @@ class CacheService:
             value = json.dumps(value)
         return await self._redis.set(key, value, ex=ttl)
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         if not self._redis:
             return None
         val = await self._redis.get(key)

@@ -8,6 +8,8 @@ export interface Owner {
   email: string | null;
   address: string | null;
   notes: string | null;
+  archived_at: string | null;
+  archived_by_user_id: number | null;
   created_at: string;
 }
 
@@ -20,7 +22,7 @@ export interface OwnerCreate {
 }
 
 export const ownersApi = {
-  list: () => api.get<Owner[]>("/owners/"),
+  list: (includeArchived = false) => api.get<Owner[]>("/owners/", { params: { include_archived: includeArchived } }),
   create: (data: OwnerCreate) => api.post<Owner>("/owners/", data),
   get: (id: number) => api.get<Owner>(`/owners/${id}`),
   update: (id: number, data: Partial<OwnerCreate>) =>

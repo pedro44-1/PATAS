@@ -1,227 +1,206 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandMark } from "@/components/BrandMark";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import {
-  LayoutDashboard,
-  Users,
-  PawPrint,
   CalendarDays,
-  Pill,
+  ClipboardCheck,
   FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PawPrint,
+  Pill,
+  Plus,
   Settings,
   UserCircle,
-  LogOut,
-  Bell,
+  Users,
+  X,
 } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS: {
-  to: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: number;
-  badgeVariant?: "default" | "warning";
-}[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/owners", label: "Donos", icon: Users },
-  { to: "/pets", label: "Animais", icon: PawPrint },
-  { to: "/appointments", label: "Consultas", icon: CalendarDays, badge: 3 },
-  { to: "/treatments", label: "Tratamentos", icon: Pill },
-  { to: "/invoices", label: "Faturas", icon: FileText, badge: 5, badgeVariant: "warning" },
+const NAV_ITEMS = [
+  { to: "/dashboard", label: "nav.dashboard", icon: LayoutDashboard },
+  { to: "/waiting-room", label: "nav.waitingRoom", icon: ClipboardCheck },
+  { to: "/appointments", label: "nav.appointments", icon: CalendarDays },
+  { to: "/owners", label: "nav.owners", icon: Users },
+  { to: "/pets", label: "nav.pets", icon: PawPrint },
+  { to: "/treatments", label: "nav.treatments", icon: Pill },
+  { to: "/invoices", label: "nav.invoices", icon: FileText },
 ];
 
-const SYSTEM_ITEMS: {
-  to: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { to: "/settings", label: "Configurações", icon: Settings },
-  { to: "/users", label: "Utilizadores", icon: UserCircle },
+const SYSTEM_ITEMS = [
+  { to: "/settings", label: "nav.settings", icon: Settings },
+  { to: "/users", label: "nav.users", icon: UserCircle },
 ];
 
-export default function Layout() {
-  const { user, logout } = useAuth();
+const MOBILE_ITEMS = [
+  { to: "/dashboard", label: "nav.dashboard", icon: LayoutDashboard },
+  { to: "/waiting-room", label: "nav.waitingRoom", icon: ClipboardCheck },
+  { to: "/appointments", label: "nav.appointments", icon: CalendarDays },
+  { to: "/pets", label: "nav.pets", icon: PawPrint },
+];
+
+function pageKey(path: string) {
+  if (path.startsWith("/waiting-room")) return "nav.waitingRoom";
+  if (path.includes("/clinical")) return "nav.clinicalAppointment";
+  if (path.startsWith("/appointments")) return "nav.appointments";
+  if (path.startsWith("/owners")) return "nav.owners";
+  if (path.startsWith("/pets")) return "nav.pets";
+  if (path.startsWith("/treatments")) return "nav.treatments";
+  if (path.startsWith("/invoices")) return "nav.invoices";
+  if (path.startsWith("/settings")) return "nav.settings";
+  if (path.startsWith("/users")) return "nav.users";
+  return "nav.dashboard";
+}
+
+function initials(name?: string) {
+  return name?.split(" ").map((item) => item[0]).join("").slice(0, 2).toUpperCase() || "PT";
+}
+
+function Navigation({ onNavigate }: { onNavigate?: () => void }) {
+  const { t } = useTranslation();
   const location = useLocation();
 
-  const initials = user?.name
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() ?? "VS";
+  return (
+    <nav className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-3 py-6">
+      <div>
+        <p className="px-3 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">{t("nav.main")}</p>
+        <div className="mt-3 space-y-1">
+          {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
+            const active = location.pathname.startsWith(to);
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={onNavigate}
+                className={cn(
+                  "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                  active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="size-[18px]" strokeWidth={active ? 2.4 : 2} />
+                {t(label)}
+              </NavLink>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <p className="px-3 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">{t("nav.system")}</p>
+        <div className="mt-3 space-y-1">
+          {SYSTEM_ITEMS.map(({ to, label, icon: Icon }) => {
+            const active = location.pathname.startsWith(to);
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={onNavigate}
+                className={cn(
+                  "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                  active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="size-[18px]" />
+                {t(label)}
+              </NavLink>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
+  );
+}
 
-  const roleLabel = user?.role === "vet" ? "Veterinário" : "Rececionista";
-  const pageTitle = getPageTitle(location.pathname);
+function UserSummary({ compact = false, onLogout }: { compact?: boolean; onLogout: () => void }) {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const role = user?.role === "admin" ? t("roles.admin") : user?.role === "vet" ? t("roles.vet") : t("roles.receptionist");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-dark-100">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 bg-dark-950 flex flex-col border-r border-dark-800">
-        {/* Logo */}
-        <div className="px-6 py-8">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-lg shadow-lg shadow-brand-600/30 flex-shrink-0">
-              🐾
-            </div>
-            <div>
-              <div className="text-white font-extrabold text-xl tracking-widest leading-none">
-                PATAS
-              </div>
-              <div className="text-dark-500 text-[10px] tracking-widest uppercase mt-0.5">
-                Vet SaaS
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav label */}
-        <div className="px-6 pb-2">
-          <p className="text-dark-600 text-xs font-semibold uppercase tracking-widest">
-            Menu
-          </p>
-        </div>
-
-        {/* Main nav */}
-        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto scrollbar-hide">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, badge, badgeVariant }) => {
-            const isActive = location.pathname.startsWith(to);
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
-                  isActive
-                    ? "bg-brand-600/15 text-brand-400 font-semibold"
-                    : "text-dark-400 hover:text-dark-100 hover:bg-dark-800/60"
-                )}
-              >
-                <Icon
-                  className={cn(
-                    "w-[18px] h-[18px] flex-shrink-0",
-                    isActive ? "text-brand-400" : "text-dark-500"
-                  )}
-                />
-                <span className="flex-1">{label}</span>
-                {badge !== undefined && (
-                  <span
-                    className={cn(
-                      "text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none",
-                      isActive || badgeVariant === "warning"
-                        ? "bg-brand-600 text-white"
-                        : "bg-dark-800 text-dark-500"
-                    )}
-                  >
-                    {badge}
-                  </span>
-                )}
-              </NavLink>
-            );
-          })}
-
-          {/* Divider */}
-          <div className="pt-4 pb-2">
-            <div className="px-3">
-              <div className="border-t border-dark-800" />
-            </div>
-            <p className="text-dark-600 text-xs font-semibold uppercase tracking-widest px-3 pt-3">
-              Sistema
-            </p>
-          </div>
-
-          {SYSTEM_ITEMS.map(({ to, label, icon: Icon }) => {
-            const isActive = location.pathname.startsWith(to);
-            return (
-              <NavLink
-                key={to}
-                to={to}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
-                  isActive
-                    ? "bg-dark-800 text-dark-100 font-semibold"
-                    : "text-dark-500 hover:text-dark-200 hover:bg-dark-800/60"
-                )}
-              >
-                <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-                <span>{label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
-
-        {/* Notification */}
-        <div className="px-4 mx-3 mb-3">
-          <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-dark-500 hover:text-dark-200 hover:bg-dark-800/60 transition-all text-sm">
-            <Bell className="w-[18px] h-[18px]" />
-            <span>Notificações</span>
-            <span className="ml-auto w-2 h-2 rounded-full bg-red-500" />
-          </button>
-        </div>
-
-        {/* User card */}
-        <div className="p-3 mx-3 mb-4 rounded-2xl bg-dark-900 border border-dark-800">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-brand-600/20 flex-shrink-0">
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-dark-100 font-semibold text-sm truncate">
-                {user?.name ?? "Veterinário"}
-              </div>
-              <div className="text-dark-500 text-xs">{roleLabel}</div>
-            </div>
-            <button
-              onClick={logout}
-              className="text-dark-500 hover:text-red-400 transition-colors p-1.5 rounded-xl hover:bg-dark-800 flex-shrink-0"
-              title="Sair"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-dark-200 flex items-center justify-between px-8 flex-shrink-0">
-          <div>
-            <h1 className="text-lg font-bold text-dark-900 leading-none">
-              {pageTitle}
-            </h1>
-            <p className="text-dark-400 text-xs mt-0.5">
-              {new Date().toLocaleDateString("pt-AO", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-600/25 transition-all active:scale-95">
-              <span className="text-base">+</span>
-              Nova Consulta
-            </button>
-          </div>
-        </header>
-
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-8">
-          <Outlet />
-        </main>
-      </div>
+    <div className={cn("flex items-center gap-3", compact ? "" : "rounded-2xl border border-border/80 bg-muted/45 p-3")}>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-xs font-bold text-secondary-foreground">{initials(user?.name)}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-foreground">{user?.name}</span>
+        <span className="block truncate text-xs text-muted-foreground">{role}</span>
+      </span>
+      <Button variant="ghost" size="icon-sm" className="rounded-lg text-muted-foreground hover:text-destructive" onClick={onLogout} title={t("nav.logout")} aria-label={t("nav.logout")}>
+        <LogOut className="size-4" />
+      </Button>
     </div>
   );
 }
 
-function getPageTitle(path: string): string {
-  if (path.startsWith("/dashboard")) return "Dashboard";
-  if (path.startsWith("/owners")) return "Donos";
-  if (path.startsWith("/pets")) return "Animais";
-  if (path.startsWith("/appointments")) return "Consultas";
-  if (path.startsWith("/treatments")) return "Tratamentos";
-  if (path.startsWith("/invoices")) return "Faturas";
-  if (path.startsWith("/settings")) return "Configurações";
-  if (path.startsWith("/users")) return "Utilizadores";
-  return "PATAS";
+function MobileNavigation() {
+  const { t } = useTranslation();
+  const location = useLocation();
+
+  return (
+    <nav className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border/80 bg-card/95 px-1 pt-2 backdrop-blur-lg md:hidden">
+      {MOBILE_ITEMS.map(({ to, label, icon: Icon }) => {
+        const active = location.pathname.startsWith(to);
+        return (
+          <NavLink key={to} to={to} className={cn("flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[0.65rem] font-semibold transition-colors", active ? "text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+            <span className={cn("flex size-7 items-center justify-center rounded-lg", active && "bg-primary/12")}><Icon className="size-[18px]" strokeWidth={active ? 2.5 : 2} /></span>
+            <span className="max-w-full truncate">{t(label)}</span>
+          </NavLink>
+        );
+      })}
+    </nav>
+  );
+}
+
+export default function Layout() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const { logout } = useAuth();
+  const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const today = new Intl.DateTimeFormat("pt-AO", { timeZone: "Africa/Luanda", weekday: "long", day: "numeric", month: "long" }).format(new Date());
+
+  return (
+    <div className="app-shell flex min-h-screen">
+      <aside className="sticky top-0 hidden h-screen w-[17rem] shrink-0 flex-col border-r border-border/80 bg-card/80 backdrop-blur xl:flex">
+        <div className="border-b border-border/70 px-6 py-6"><BrandMark /></div>
+        <Navigation />
+        <div className="border-t border-border/70 p-4"><UserSummary onLogout={logout} /></div>
+      </aside>
+
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="w-[17rem] gap-0 border-r border-border bg-card p-0 sm:max-w-none" showCloseButton={false}>
+          <div className="flex items-center justify-between border-b border-border/70 px-5 py-5">
+            <BrandMark compact />
+            <Button variant="ghost" size="icon-sm" className="rounded-lg" onClick={() => setMobileOpen(false)} aria-label={t("common.closeMenu")}><X className="size-4" /></Button>
+          </div>
+          <Navigation onNavigate={() => setMobileOpen(false)} />
+          <div className="border-t border-border/70 p-4"><UserSummary onLogout={logout} /></div>
+        </SheetContent>
+      </Sheet>
+
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-30 flex h-[4.5rem] items-center justify-between border-b border-border/70 bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="ghost" size="icon" className="rounded-xl xl:hidden" onClick={() => setMobileOpen(true)} aria-label={t("common.openMenu")}><Menu className="size-5" /></Button>
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-bold text-foreground sm:text-lg">{t(pageKey(location.pathname))}</h1>
+              <p className="hidden truncate text-xs capitalize text-muted-foreground sm:block">{today}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
+            <Button className="h-9 rounded-xl px-3 text-xs font-semibold shadow-[0_8px_20px_oklch(var(--primary)/0.18)] sm:px-4 sm:text-sm" onClick={() => navigate("/appointments")}>
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">{t("appointments.new")}</span>
+            </Button>
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-[96rem] px-4 py-5 pb-24 sm:px-6 sm:py-6 sm:pb-6 lg:px-8 lg:py-8"><Outlet /></main>
+      </div>
+      <MobileNavigation />
+    </div>
+  );
 }

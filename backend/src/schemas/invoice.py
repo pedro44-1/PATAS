@@ -1,7 +1,8 @@
-﻿from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 
-from src.models.invoice import InvoiceStatus
+from pydantic import BaseModel, Field, model_validator
+
+from src.models.invoice import InvoiceStatus, InvoiceSyncStatus
 
 
 class InvoiceCreate(BaseModel):
@@ -21,7 +22,7 @@ class InvoiceUpdate(BaseModel):
     @model_validator(mode="after")
     def validate_cancelled_reason(self):
         if self.status == InvoiceStatus.CANCELLED and not self.reason:
-            raise ValueError("reason Г© obrigatГіrio ao cancelar uma factura")
+            raise ValueError("reason é obrigatório ao cancelar uma factura")
         return self
 
 
@@ -32,8 +33,11 @@ class InvoiceResponse(BaseModel):
     appointment_id: int | None
     amount: float
     status: InvoiceStatus
+    currency: str
     description: str | None
     reason: str | None
+    external_reference: str | None
+    sync_status: InvoiceSyncStatus
     created_at: datetime
 
     class Config:

@@ -1,12 +1,13 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, get_current_user
 from src.core.safe_update import safe_update
 from src.models.owner import Owner
-from src.schemas.owner import OwnerCreate, OwnerUpdate, OwnerResponse
+from src.schemas.owner import OwnerCreate, OwnerResponse, OwnerUpdate
 from src.services.audit import audit
 
 router = APIRouter()
@@ -14,16 +15,19 @@ router = APIRouter()
 OWNER_FIELDS = {"name", "phone", "email", "address", "notes"}
 
 
-@router.get("/", response_model=List[OwnerResponse])
+@router.get("/", response_model=list[OwnerResponse])
 def list_owners(
     response: Response,
     skip: int = 0,
     limit: int = 100,
-    q: Optional[str] = None,
+    q: str | None = None,
+    include_archived: bool = False,
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     query = db.query(Owner).filter(Owner.clinic_id == current_user.clinic_id)
+    if not include_archived:
+        query = query.filter(Owner.archived_at.is_(None))
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -69,7 +73,7 @@ def get_owner(
         Owner.id == owner_id, Owner.clinic_id == current_user.clinic_id
     ).first()
     if not owner:
-        raise HTTPException(status_code=404, detail="Dono nГЈo encontrado")
+        raise HTTPException(status_code=404, detail="Dono não encontrado")
     return owner
 
 
@@ -85,7 +89,9 @@ def update_owner(
         Owner.id == owner_id, Owner.clinic_id == current_user.clinic_id
     ).first()
     if not owner:
-        raise HTTPException(status_code=404, detail="Dono nГЈo encontrado")
+        raise HTTPException(status_code=404, detail="Dono não encontrado")
+    if owner.archived_at is not None:
+        raise HTTPException(status_code=409, detail="Um dono arquivado não pode ser alterado")
     updates = data.model_dump(exclude_unset=True)
     safe_update(owner, updates, OWNER_FIELDS)
     db.commit()
@@ -114,18 +120,25 @@ def delete_owner(
         Owner.id == owner_id, Owner.clinic_id == current_user.clinic_id
     ).first()
     if not owner:
-        raise HTTPException(status_code=404, detail="Dono nГЈo encontrado")
-    owner_name = owner.name
-    db.delete(owner)
+        raise HTTPException(status_code=404, detail="Dono não encontrado")
+    if owner.archived_at is not None:
+        return {"ok": True, "archived_at": owner.archived_at}
+    archived_at = datetime.now(UTC)
+    owner.archived_at = archived_at
+    owner.archived_by_user_id = current_user.id
+    for pet in owner.pets:
+        if pet.archived_at is None:
+            pet.archived_at = archived_at
+            pet.archived_by_user_id = current_user.id
     db.commit()
     audit(
         db,
         clinic_id=current_user.clinic_id,
         user_id=current_user.id,
-        action="DELETE",
+        action="ARCHIVE",
         resource="owner",
         resource_id=owner_id,
-        details={"name": owner_name},
+        details={"name": owner.name, "pets_archived": len(owner.pets)},
         ip_address=request.client.host if request else None,
     )
-    return {"ok": True}
+    return {"ok": True, "archived_at": archived_at}

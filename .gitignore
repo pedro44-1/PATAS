@@ -41,6 +41,7 @@ packages/shared-types/dist/
 
 # ─── Docker ────────────────────────────────────────────────────────────────────
 docker-compose.override.yml
+infra/backups/
 
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 .pytest_cache/

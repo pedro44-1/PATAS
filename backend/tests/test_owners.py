@@ -45,7 +45,27 @@ def test_delete_owner(client, vet_headers, owner):
     assert response.status_code == 200
     assert response.json()["ok"] is True
     response = client.get(f"/api/v1/owners/{owner.id}", headers=vet_headers)
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json()["archived_at"] is not None
+    assert client.get("/api/v1/owners/", headers=vet_headers).json() == []
+    archived = client.get("/api/v1/owners/?include_archived=true", headers=vet_headers)
+    assert any(item["id"] == owner.id for item in archived.json())
+
+
+def test_archiving_owner_archives_pets_and_blocks_new_invoice(
+    client, vet_headers, owner, pet
+):
+    response = client.delete(f"/api/v1/owners/{owner.id}", headers=vet_headers)
+    assert response.status_code == 200
+    archived_pet = client.get(f"/api/v1/pets/{pet.id}", headers=vet_headers)
+    assert archived_pet.status_code == 200
+    assert archived_pet.json()["archived_at"] is not None
+    assert client.get("/api/v1/pets/", headers=vet_headers).json() == []
+    invoice = client.post("/api/v1/invoices/", headers=vet_headers, json={
+        "owner_id": owner.id,
+        "amount": 100,
+    })
+    assert invoice.status_code == 404
 
 
 def test_receptionist_can_list_owners(client, receptionist_headers):

@@ -27,10 +27,25 @@ services:
       timeout: 3s
       retries: 10
 
-  backend_test:
+  migrate_test:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: patas-backend:test
+    container_name: patas_migrate_test
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://patas:patas_test_password@db_test:5432/patas_test
+      SECRET_KEY: test-secret-key-for-integration-tests
+      ENCRYPTION_KEY: test-encryption-key-for-integration-tests
+      APP_ENV: test
+    command: alembic upgrade head
+    depends_on:
+      db_test:
+        condition: service_healthy
+
+  backend_test:
+    image: patas-backend:test
     container_name: patas_backend_test
     restart: "no"
     environment:
@@ -40,10 +55,10 @@ services:
       ENCRYPTION_KEY: test-encryption-key-for-integration-tests
       APP_ENV: test
       CORS_ORIGINS: "*"
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
     depends_on:
-      db_test:
-        condition: service_healthy
+      migrate_test:
+        condition: service_completed_successfully
       redis_test:
         condition: service_healthy
     ports:

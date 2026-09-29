@@ -1,6 +1,7 @@
 // ─── Invoice types ────────────────────────────────────────────────────────────────
 
-export type InvoiceStatus = "draft" | "paid" | "cancelled";
+export type InvoiceStatus = "draft" | "sent" | "paid" | "cancelled";
+export type InvoiceSyncStatus = "pending" | "synced" | "failed";
 
 export interface InvoiceCreate {
   owner_id: number;
@@ -24,7 +25,10 @@ export interface InvoiceResponse {
   appointment_id: number | null;
   amount: number;
   status: InvoiceStatus;
+  currency: string;
   description: string | null;
   reason: string | null;
+  external_reference: string | null;
+  sync_status: InvoiceSyncStatus;
   created_at: string; // ISO datetime
 }

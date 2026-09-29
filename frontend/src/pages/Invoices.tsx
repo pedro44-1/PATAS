@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { invoicesApi, Invoice, InvoiceStatus } from "@/api/invoices";
 import { ownersApi, Owner } from "@/api/owners";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormSelect } from "@/components/ui/form-select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -17,22 +19,18 @@ import {
 import { cn } from "@/lib/utils";
 import { Plus, FileText, Check, X } from "lucide-react";
 
-const STATUS_OPTIONS = [
-  { value: "", label: "Todas" },
-  { value: "draft", label: "Rascunho" },
-  { value: "paid", label: "Pagas" },
-  { value: "cancelled", label: "Canceladas" },
-];
-
-function statusConfig(status: InvoiceStatus) {
+function statusConfig(status: InvoiceStatus, label: string) {
+  if (status === "sent")
+    return { label, bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
   if (status === "paid")
-    return { label: "Paga", bg: "bg-brand-50", text: "text-brand-700", dot: "bg-brand-500" };
+    return { label, bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
   if (status === "cancelled")
-    return { label: "Cancelada", bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
-  return { label: "Rascunho", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
+    return { label, bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
+  return { label, bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
 }
 
 export default function Invoices() {
+  const { t } = useTranslation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,8 +38,11 @@ export default function Invoices() {
   const [filterStatus, setFilterStatus] = useState("");
   const [form, setForm] = useState({ owner_id: 0, amount: 0, description: "" });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const statusOptions = ["", "draft", "sent", "paid", "cancelled"];
 
   function load() {
+    setError("");
     Promise.all([
       invoicesApi.list(filterStatus ? { status: filterStatus } : undefined),
       ownersApi.list(),
@@ -50,6 +51,7 @@ export default function Invoices() {
         setInvoices(iRes.data);
         setOwners(oRes.data);
       })
+      .catch(() => setError(t("invoices.error")))
       .finally(() => setLoading(false));
   }
 
@@ -67,26 +69,36 @@ export default function Invoices() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
       await invoicesApi.create({ ...form, amount: Number(form.amount) });
       setShowForm(false);
       load();
-    } catch {} finally {
+    } catch {
+      setError(t("invoices.error"));
+    } finally {
       setSaving(false);
     }
   }
 
   async function handleStatus(id: number, status: InvoiceStatus) {
     try {
-      await invoicesApi.update(id, { status });
+      const reason = status === "cancelled" ? window.prompt(t("invoices.cancelReason")) ?? "" : undefined;
+      if (status === "cancelled" && !reason?.trim()) return;
+      await invoicesApi.update(id, { status, reason });
       load();
-    } catch {}
+    } catch {
+      setError(t("invoices.error"));
+    }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Eliminar esta fatura?")) return;
-    await invoicesApi.delete(id);
-    load();
+  async function handleSync(id: number) {
+    try {
+      await invoicesApi.sync(id);
+      load();
+    } catch {
+      setError(t("invoices.error"));
+    }
   }
 
   function getOwnerName(id: number) {
@@ -97,29 +109,24 @@ export default function Invoices() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-dark-900">Faturas</h2>
+          <h2 className="text-2xl font-extrabold text-dark-900">{t("invoices.title")}</h2>
           <p className="text-dark-400 text-sm mt-0.5">
-            {invoices.length} factura{invoices.length !== 1 ? "s" : ""}
+            {t("invoices.count", { count: invoices.length })}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select
+          <FormSelect
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="h-10 rounded-xl border border-dark-200 bg-white px-3 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            {STATUS_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onValueChange={setFilterStatus}
+            options={statusOptions.map((value) => ({ value, label: t(`invoices.filter.${value || "all"}`) }))}
+            className="w-auto min-w-36 border-dark-200 bg-white text-dark-700"
+          />
           <Button
             onClick={openCreate}
             className="bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Nova Fatura
+            {t("invoices.new")}
           </Button>
         </div>
       </div>
@@ -132,13 +139,13 @@ export default function Invoices() {
           </div>
           <div className="flex-1">
             <p className="text-amber-800 text-sm font-semibold">
-              Total pendente de cobrança
+              {t("invoices.pendingAlert.label")}
             </p>
             <p className="text-amber-600 text-xs">
-              {pendingTotal.toLocaleString("pt-AO")} Kz em{" "}
-              {invoices.filter((i) => i.status === "draft").length} factura
-              {invoices.filter((i) => i.status === "draft").length !== 1 ? "s" : ""}{" "}
-              não paga
+              {t("invoices.pendingAlert.hint", {
+                amount: pendingTotal.toLocaleString("pt-AO"),
+                count: invoices.filter((i) => i.status === "draft").length,
+              })}
             </p>
           </div>
           <span className="text-amber-800 font-extrabold text-lg">
@@ -146,6 +153,8 @@ export default function Invoices() {
           </span>
         </div>
       )}
+
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
 
       <Card>
         <CardContent className="p-0">
@@ -156,23 +165,23 @@ export default function Invoices() {
           ) : invoices.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-dark-400">
               <FileText className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-sm font-medium">Nenhuma factura</p>
+              <p className="text-sm font-medium">{t("invoices.noResults")}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-dark-100">
-                  <TableHead className="pl-5 w-16">Nº</TableHead>
-                  <TableHead>Dono</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead className="pr-5 w-48 text-right">Ações</TableHead>
+                  <TableHead className="pl-5 w-16">{t("invoices.table.number")}</TableHead>
+                  <TableHead>{t("invoices.table.owner")}</TableHead>
+                  <TableHead>{t("invoices.table.value")}</TableHead>
+                  <TableHead>{t("invoices.table.status")}</TableHead>
+                  <TableHead>{t("invoices.table.description")}</TableHead>
+                  <TableHead className="pr-5 w-48 text-right">{t("invoices.table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {invoices.map((inv) => {
-                  const cfg = statusConfig(inv.status);
+                  const cfg = statusConfig(inv.status, t(`invoices.status.${inv.status}`));
                   return (
                     <TableRow key={inv.id}>
                       <TableCell className="pl-5">
@@ -206,27 +215,27 @@ export default function Invoices() {
                         </span>
                       </TableCell>
                       <TableCell className="pr-5">
-                        {inv.status === "draft" ? (
+                        {inv.status === "draft" || inv.status === "sent" ? (
                           <div className="flex justify-end gap-2">
-                            <button
+                            {inv.status === "draft" && <button
+                              onClick={() => handleSync(inv.id)}
+                              className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition-colors"
+                              title={t("invoices.actions.sendHint")}
+                            >
+                              {t("invoices.actions.send")}
+                            </button>}
+                            {inv.status === "draft" && <button
                               onClick={() => handleStatus(inv.id, "paid")}
                               className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
-                              title="Marcar como paga"
+                              title={t("invoices.actions.markPaidHint")}
                             >
                               <Check className="w-3.5 h-3.5" />
-                              Paga
-                            </button>
+                              {t("invoices.actions.markPaid")}
+                            </button>}
                             <button
                               onClick={() => handleStatus(inv.id, "cancelled")}
                               className="p-1.5 rounded-lg bg-dark-100 text-dark-500 hover:bg-dark-200 transition-colors"
-                              title="Cancelar"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(inv.id)}
-                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                              title="Eliminar"
+                              title={t("common.cancel")}
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -256,8 +265,8 @@ export default function Invoices() {
             {/* Modal header */}
             <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <div>
-                <h2 className="font-bold text-dark-900">Nova Fatura</h2>
-                <p className="text-dark-400 text-xs mt-0.5">Emitir uma nova fatura</p>
+                <h2 className="font-bold text-dark-900">{t("invoices.new")}</h2>
+                <p className="text-dark-400 text-xs mt-0.5">{t("invoices.createHint")}</p>
               </div>
               <button
                 onClick={() => setShowForm(false)}
@@ -270,40 +279,37 @@ export default function Invoices() {
             {/* Modal body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Dono *</Label>
-                <select
-                  value={form.owner_id}
-                  onChange={(e) => setForm({ ...form, owner_id: Number(e.target.value) })}
-                  className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                <Label className="text-xs font-semibold text-dark-600">{t("invoices.form.owner")} *</Label>
+                <FormSelect
+                  value={form.owner_id || null}
+                  onValueChange={(value) => setForm({ ...form, owner_id: Number(value) })}
+                  options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
+                  placeholder={t("invoices.form.selectOwner")}
+                  className="h-11 border-dark-200 bg-white"
                   required
-                >
-                  <option value={0}>Selecionar dono</option>
-                  {owners.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Valor (Kz) *</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("invoices.form.amount")} *</Label>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.amount || ""}
                   onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-                  placeholder="2500"
+                  placeholder={t("invoices.form.amountPlaceholder")}
                   required
                   className="h-11 rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Descrição</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("invoices.form.description")}</Label>
                 <Input
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Descrição da factura"
+                  placeholder={t("invoices.form.descriptionPlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
@@ -315,7 +321,7 @@ export default function Invoices() {
                   onClick={() => setShowForm(false)}
                   className="rounded-xl h-11"
                 >
-                  Cancelar
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -325,9 +331,9 @@ export default function Invoices() {
                   {saving ? (
                     <span className="flex items-center gap-2">
                       <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      A emitir...
+                      {t("invoices.issuing")}
                     </span>
-                  ) : "Emitir Fatura"}
+                  ) : t("invoices.issue")}
                 </Button>
               </div>
             </form>

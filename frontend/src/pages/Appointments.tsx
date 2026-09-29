@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { appointmentsApi, Appointment, AppointmentCreate } from "@/api/appointments";
+import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
+import { appointmentsApi, Appointment, AppointmentCreate, VetOption } from "@/api/appointments";
 import { petsApi, Pet } from "@/api/pets";
+import { serviceTypesApi } from "@/api/serviceTypes";
+import type { ServiceType } from "@patas/shared-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormSelect } from "@/components/ui/form-select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -15,42 +20,56 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { clinicDateInput, parseApiDate } from "@/lib/date";
 import { Plus, Search, CalendarDays, Check, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiErrorMessage } from "@/api/errors";
 
 function statusConfig(status: string) {
+  if (status === "in-progress")
+    return { key: "in-progress", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
   if (status === "completed")
-    return { label: "Concluída", bg: "bg-brand-50", text: "text-brand-700", dot: "bg-brand-500" };
+    return { key: "completed", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
   if (status === "cancelled")
-    return { label: "Cancelada", bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
+    return { key: "cancelled", bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
   if (status === "no-show")
-    return { label: "Faltou", bg: "bg-dark-100", text: "text-dark-600", dot: "bg-dark-400" };
-  return { label: "Agendada", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
+    return { key: "no-show", bg: "bg-dark-100", text: "text-dark-600", dot: "bg-dark-400" };
+  return { key: "scheduled", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
 }
 
 export default function Appointments() {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const canWriteClinical = user?.role === "admin" || user?.role === "vet";
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
+  const [vets, setVets] = useState<VetOption[]>([]);
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterDate, setFilterDate] = useState(
-    new Date().toISOString().split("T")[0]
+    clinicDateInput()
   );
   const [form, setForm] = useState<AppointmentCreate>({
     pet_id: 0,
-    vet_id: 1,
+    vet_id: 0,
     scheduled_at: "",
     duration_min: 30,
     reason: "",
     notes: "",
     weight: undefined,
+    service_type_id: undefined,
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   function load() {
-    Promise.all([appointmentsApi.list(filterDate), petsApi.list()])
-      .then(([apptsRes, petsRes]) => {
+    Promise.all([appointmentsApi.list(filterDate), petsApi.list(), appointmentsApi.vets(), serviceTypesApi.list()])
+      .then(([apptsRes, petsRes, vetsRes, serviceTypesRes]) => {
         setAppointments(apptsRes.data);
         setPets(petsRes.data);
+        setVets(vetsRes.data);
+        setServiceTypes(serviceTypesRes.data);
       })
       .finally(() => setLoading(false));
   }
@@ -61,12 +80,13 @@ export default function Appointments() {
     const defaultTime = `${filterDate}T09:00`;
     setForm({
       pet_id: pets[0]?.id ?? 0,
-      vet_id: 1,
+      vet_id: vets[0]?.id ?? 0,
       scheduled_at: defaultTime,
       duration_min: 30,
       reason: "",
       notes: "",
       weight: undefined,
+      service_type_id: serviceTypes[0]?.id,
     });
     setShowForm(true);
   }
@@ -74,40 +94,47 @@ export default function Appointments() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
       await appointmentsApi.create(form);
       setShowForm(false);
       load();
-    } catch {} finally {
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "appointments.error"));
+    } finally {
       setSaving(false);
     }
   }
 
   async function handleStatus(id: number, status: string) {
-    await appointmentsApi.update(id, { status: status as any });
-    load();
-  }
-
-  async function handleDelete(id: number) {
-    if (!confirm("Eliminar esta consulta?")) return;
-    await appointmentsApi.delete(id);
-    load();
+    const requiresReason = status === "cancelled" || status === "no-show";
+    const status_reason = requiresReason
+      ? window.prompt(t(status === "cancelled" ? "appointments.cancelReason" : "appointments.noShowReason")) ?? ""
+      : undefined;
+    if (requiresReason && !status_reason?.trim()) return;
+    setError("");
+    try {
+      await appointmentsApi.update(id, { status: status as any, status_reason });
+      load();
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "appointments.error"));
+    }
   }
 
   function getPetName(id: number) {
     return pets.find((p) => p.id === id)?.name ?? "—";
   }
 
-  const todayLabel = new Date(filterDate + "T00:00:00").toLocaleDateString(
+  const todayLabel = new Date(filterDate + "T12:00:00Z").toLocaleDateString(
     "pt-AO",
-    { weekday: "long", day: "numeric", month: "long" }
+    { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Luanda" }
   );
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-dark-900">Consultas</h2>
+          <h2 className="text-2xl font-extrabold text-dark-900">{t("appointments.title")}</h2>
           <p className="text-dark-400 text-sm mt-0.5 capitalize">{todayLabel}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -125,10 +152,11 @@ export default function Appointments() {
             className="bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Nova Consulta
+            {t("appointments.new")}
           </Button>
         </div>
       </div>
+      {error && <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
       <Card>
         <CardContent className="p-0">
@@ -139,18 +167,18 @@ export default function Appointments() {
           ) : appointments.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-dark-400">
               <CalendarDays className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-sm font-medium">Nenhuma consulta para este dia</p>
+              <p className="text-sm font-medium">{t("appointments.noResults")}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-dark-100">
-                  <TableHead className="pl-5 w-20">Hora</TableHead>
-                  <TableHead>Animal</TableHead>
-                  <TableHead>Motivo</TableHead>
-                  <TableHead>Duração</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="pr-5 w-48 text-right">Ações</TableHead>
+                  <TableHead className="pl-5 w-20">{t("appointments.table.time")}</TableHead>
+                  <TableHead>{t("appointments.table.animal")}</TableHead>
+                  <TableHead>{t("appointments.table.reason")}</TableHead>
+                  <TableHead>{t("appointments.table.duration")}</TableHead>
+                  <TableHead>{t("appointments.table.status")}</TableHead>
+                  <TableHead className="pr-5 w-48 text-right">{t("appointments.table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -160,9 +188,10 @@ export default function Appointments() {
                     <TableRow key={a.id}>
                       <TableCell className="pl-5">
                         <div className="font-bold text-sm text-dark-900">
-                          {new Date(a.scheduled_at).toLocaleTimeString("pt-AO", {
+                          {parseApiDate(a.scheduled_at).toLocaleTimeString("pt-AO", {
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: "Africa/Luanda",
                           })}
                         </div>
                         <div className="text-dark-400 text-xs">{a.duration_min} min</div>
@@ -191,26 +220,37 @@ export default function Appointments() {
                           )}
                         >
                           <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
-                          {cfg.label}
+                          {t(`appointments.status.${cfg.key}`)}
                         </span>
                       </TableCell>
                       <TableCell className="pr-5">
                         {a.status === "scheduled" ? (
                           <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleStatus(a.id, "completed")}
+                            {canWriteClinical && <button
+                              onClick={() => handleStatus(a.id, "in-progress")}
                               className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
-                              title="Marcar como concluída"
+                              title={t("appointments.actions.start")}
                             >
                               <Check className="w-3.5 h-3.5" />
-                              Concluir
-                            </button>
+                              {t("appointments.actions.start")}
+                            </button>}
                             <button
                               onClick={() => handleStatus(a.id, "cancelled")}
                               className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                              title="Cancelar"
+                              title={t("appointments.actions.cancel")}
                             >
                               <X className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleStatus(a.id, "no-show")} className="px-2.5 py-1 rounded-lg bg-dark-100 text-dark-600 hover:bg-dark-200 text-xs font-semibold transition-colors">{t("appointments.actions.noShow")}</button>
+                          </div>
+                        ) : a.status === "in-progress" && canWriteClinical ? (
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleStatus(a.id, "completed")}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              {t("appointments.actions.complete")}
                             </button>
                           </div>
                         ) : (
@@ -227,20 +267,20 @@ export default function Appointments() {
       </Card>
 
       {/* Form Dialog */}
-      {showForm && (
+      {showForm && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
           onClick={() => setShowForm(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
-            <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+            <div className="flex shrink-0 items-center justify-between rounded-t-2xl border-b border-dark-100 bg-white px-6 py-4">
               <div>
-                <h2 className="font-bold text-dark-900">Nova Consulta</h2>
-                <p className="text-dark-400 text-xs mt-0.5">Registar uma nova consulta</p>
+                <h2 className="font-bold text-dark-900">{t("appointments.new")}</h2>
+                <p className="text-dark-400 text-xs mt-0.5">{t("appointments.create")}</p>
               </div>
               <button
                 onClick={() => setShowForm(false)}
@@ -251,24 +291,34 @@ export default function Appointments() {
             </div>
 
             {/* Modal body */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Animal *</Label>
-                <select
-                  value={form.pet_id}
-                  onChange={(e) => setForm({ ...form, pet_id: Number(e.target.value) })}
-                  className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.animal")} *</Label>
+                <FormSelect
+                  value={form.pet_id || null}
+                  onValueChange={(value) => setForm({ ...form, pet_id: Number(value) })}
+                  options={pets.map((pet) => ({ value: pet.id, label: pet.name }))}
+                  placeholder={t("appointments.form.selectAnimal")}
+                  className="h-11 border-dark-200 bg-white"
                   required
-                >
-                  <option value={0}>Selecionar animal</option>
-                  {pets.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Data e Hora *</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.vet")} *</Label>
+                <FormSelect
+                  value={form.vet_id || null}
+                  onValueChange={(value) => setForm({ ...form, vet_id: Number(value) })}
+                  options={vets.map((vet) => ({ value: vet.id, label: vet.name }))}
+                  placeholder={t("appointments.form.selectVet")}
+                  className="h-11 border-dark-200 bg-white"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.dateTime")} *</Label>
                 <Input
                   type="datetime-local"
                   value={form.scheduled_at}
@@ -279,42 +329,51 @@ export default function Appointments() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Motivo da Consulta</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.reason")}</Label>
                 <Input
                   value={form.reason}
                   onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                  placeholder="Ex: Vacinação, Consulta geral, Exame de sangue"
+                  placeholder={t("appointments.form.reasonPlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">Notas</Label>
+                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.service")}</Label>
+                <FormSelect
+                  value={form.service_type_id ?? ""}
+                  onValueChange={(value) => setForm({ ...form, service_type_id: value ? Number(value) : undefined })}
+                  options={[
+                    { value: "", label: t("appointments.form.selectService") },
+                    ...serviceTypes.filter((service) => service.active).map((service) => ({ value: service.id, label: service.name })),
+                  ]}
+                  placeholder={t("appointments.form.selectService")}
+                  className="h-11 border-dark-200 bg-white"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.notes")}</Label>
                 <Input
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Notas adicionais"
+                  placeholder={t("appointments.form.notesPlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">Duração</Label>
-                  <select
+                  <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.duration")}</Label>
+                  <FormSelect
                     value={form.duration_min}
-                    onChange={(e) => setForm({ ...form, duration_min: Number(e.target.value) })}
-                    className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  >
-                    <option value={15}>15 minutos</option>
-                    <option value={30}>30 minutos</option>
-                    <option value={45}>45 minutos</option>
-                    <option value={60}>60 minutos</option>
-                    <option value={90}>90 minutos</option>
-                  </select>
+                    onValueChange={(value) => setForm({ ...form, duration_min: Number(value) })}
+                    options={[15, 30, 45, 60, 90].map((minutes) => ({ value: minutes, label: `${minutes} minutos` }))}
+                    className="h-11 border-dark-200 bg-white"
+                  />
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">Peso registado (kg)</Label>
+                {canWriteClinical && <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.weight")}</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -323,21 +382,22 @@ export default function Appointments() {
                     onChange={(e) =>
                       setForm({ ...form, weight: e.target.value ? Number(e.target.value) : undefined })
                     }
-                    placeholder="Ex: 12.5"
+                    placeholder={t("appointments.form.weightPlaceholder")}
                     className="h-11 rounded-xl"
                   />
-                </div>
+                </div>}
+              </div>
               </div>
 
               {/* Modal footer */}
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-dark-100">
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-dark-100 bg-white px-6 py-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowForm(false)}
                   className="rounded-xl h-11"
                 >
-                  Cancelar
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -347,14 +407,15 @@ export default function Appointments() {
                   {saving ? (
                     <span className="flex items-center gap-2">
                       <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      A agendar...
+                      {t("appointments.saving")}
                     </span>
-                  ) : "Agendar Consulta"}
+                  ) : t("appointments.create")}
                 </Button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

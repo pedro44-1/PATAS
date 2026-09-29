@@ -9,6 +9,9 @@ export * from "./pet.js";
 export * from "./appointment.js";
 export * from "./treatment.js";
 export * from "./invoice.js";
+export * from "./service-type.js";
+export * from "./waiting-room.js";
+export * from "./clinical.js";
 
 // ─── Common / utility types ─────────────────────────────────────────────────────
 

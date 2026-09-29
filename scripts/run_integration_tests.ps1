@@ -4,13 +4,21 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+if (-not [System.IO.Path]::IsPathRooted($ComposeFile)) {
+    $ComposeFile = Join-Path $RepositoryRoot $ComposeFile
+}
+$ComposeFile = (Resolve-Path $ComposeFile).Path
 
 Write-Host "=== PATAS Integration Test Runner ===" -ForegroundColor Cyan
 Write-Host ""
 
 function Cleanup {
     Write-Host "`nTearing down test stack..." -ForegroundColor Yellow
-    docker compose -f $ComposeFile -p $ProjectName down --volumes --remove-orphans 2>$null
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    docker compose -f $ComposeFile -p $ProjectName down --volumes --remove-orphans *>$null
+    $ErrorActionPreference = $previousErrorAction
 }
 
 try {
@@ -45,8 +53,9 @@ try {
 
     Write-Host "`nRunning integration tests..." -ForegroundColor Green
     $env:BASE_URL = "http://localhost:8001"
+    $env:POSTGRES_ADMIN_URL = "postgresql://patas:patas_test_password@localhost:5433/postgres"
     cd (Join-Path $PSScriptRoot "..\backend")
-    python -m pytest tests/test_integration.py -v --tb=long
+    python -m pytest tests/test_integration.py tests/test_postgres_migrations.py -m integration -v --tb=long
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -eq 0) {

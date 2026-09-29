@@ -1,226 +1,138 @@
-# AGENTS.md — PATAS Veterinary Clinic SaaS
+# DOX framework
 
-> Angola market. Luanda/Benguela focus. Portuguese language UI.
-> **Current version: 0.2.0** (structure refactored)
+- DOX is the project-wide `AGENTS.md` hierarchy for PATAS.
+- Agents must follow the DOX instructions across any edits.
 
----
+## Core Contract
 
-## Project Location
+- `AGENTS.md` files are binding work contracts for their subtrees.
+- Work products, source materials, instructions, records, assets, and durable docs must stay understandable from the nearest applicable `AGENTS.md` plus every parent `AGENTS.md` above it.
 
-`C:\PATAS\` — completely separate from `C:\Warehouse-Startup`
+## Read Before Editing
 
----
+1. Read the root `AGENTS.md`.
+2. Identify every file or folder expected to be touched.
+3. Walk from the repository root to each target path.
+4. Read every `AGENTS.md` found along each route.
+5. If a parent `AGENTS.md` lists a child `AGENTS.md` whose scope contains the path, read that child and continue from there.
+6. Use the nearest `AGENTS.md` as the local contract and parent docs for repo-wide rules.
+7. Do not rely on memory; re-read the applicable DOX chain in the current session before editing.
 
-## Architecture
+## Update After Editing
 
-```
-C:\PATAS\
-├── .github/
-│   └── workflows/
-│       └── ci.yml               ← lint + test + build on every PR
-│
-├── packages/
-│   └── shared-types/            ← TypeScript types from Pydantic schemas
-│       ├── src/
-│       │   ├── index.ts        ← barrel + common types
-│       │   ├── user.ts
-│       │   ├── owner.ts
-│       │   ├── pet.ts
-│       │   ├── appointment.ts
-│       │   ├── treatment.ts
-│       │   └── invoice.ts
-│       └── dist/               ← built by `npm run build`
-│
-├── backend/
-│   ├── src/                    ← FastAPI application (src/ not app/)
-│   │   ├── main.py             ← FastAPI entry point
-│   │   ├── seed.py             ← CLI: python -m src.seed
-│   │   ├── config.py           ← pydantic-settings
-│   │   ├── database.py         ← SQLAlchemy engine + session
-│   │   ├── security.py         ← JWT + password hashing
-│   │   ├── deps.py             ← get_db, CurrentUser, require_permission
-│   │   │
-│   │   ├── models/            ← SQLAlchemy models
-│   │   ├── schemas/           ← Pydantic v2 schemas
-│   │   ├── api/               ← Routers (no v1/ subfolder)
-│   │   └── services/           ← audit, cache, notifications
-│   │
-│   ├── migrations/             ← Alembic (NOT alembic/ at root)
-│   ├── tests/                ← pytest (NOT in src/)
-│   ├── scripts/               ← seed_permissions, seed_demo
-│   │
-│   ├── Dockerfile             ← multi-stage build
-│   ├── requirements.txt       ← pinned deps
-│   ├── requirements-dev.txt   ← black, ruff, mypy
-│   ├── pyproject.toml         ← PEP 621 metadata + tool config
-│   └── run.py                 ← python run.py (src.main:app)
-│
-├── frontend/
-│   ├── src/
-│   │   ├── main.tsx
-│   │   ├── App.tsx
-│   │   ├── i18n.ts           ← i18next configuration
-│   │   │
-│   │   ├── api/              ← axios client + typed API modules
-│   │   │
-│   │   ├── features/         ← self-contained feature modules
-│   │   │   ├── auth/         ← LoginPage, useAuth
-│   │   │   ├── dashboard/
-│   │   │   ├── owners/
-│   │   │   ├── pets/
-│   │   │   │   ├── PetsPage.tsx
-│   │   │   │   ├── PetDetailPage.tsx
-│   │   │   │   └── components/  ← PetIdentityCard, WeightChart...
-│   │   │   ├── appointments/
-│   │   │   ├── treatments/
-│   │   │   └── invoices/
-│   │   │
-│   │   ├── components/
-│   │   │   ├── ui/           ← shadcn primitives
-│   │   │   ├── layout/       ← Layout, Sidebar, TopBar
-│   │   │   └── shared/       ← ConfirmDialog, EmptyState...
-│   │   │
-│   │   ├── hooks/            ← shared custom hooks
-│   │   ├── locales/          ← i18n JSON files
-│   │   │   ├── pt.json       ← Portuguese (PT-AO first)
-│   │   │   └── en.json
-│   │   ├── lib/              ← utils, constants
-│   │   └── types/            ← app-specific TS types
-│   │
-│   ├── public/               ← PWA manifest, icons, sw.js
-│   ├── nginx.conf
-│   ├── Dockerfile
-│   └── package.json
-│
-├── infra/
-│   ├── docker-compose.yml      ← production (1 backend + 1 frontend + DB + Redis)
-│   ├── docker-compose.dev.yml  ← dev (volumes + hot-reload)
-│   ├── nginx/
-│   │   ├── nginx.conf         ← base reverse-proxy config
-│   │   └── nginx-ssl.conf    ← TLS config (certbot-ready)
-│   ├── .env.example          ← all env vars documented
-│   └── scripts/
-│       └── init-db.sh
-│
-├── docs/
-│   ├── api.md
-│   ├── setup.md
-│   └── ARCHITECTURE.md        ← system diagram, decisions
-│
-├── packages/                   ← npm workspace root
-├── .github/workflows/ci.yml
-├── Makefile                   ← `make dev`, `make test`, etc.
-├── docker-compose.yml         ← local dev (delegates to infra/)
-└── AGENTS.md
-```
+Every meaningful change requires a DOX pass before the task is done.
 
----
+Update the closest owning `AGENTS.md` when a change affects:
 
-## Running Locally
+- purpose, scope, ownership, or responsibilities;
+- durable structure, contracts, workflows, or operating rules;
+- required inputs, outputs, permissions, constraints, side effects, or artifacts;
+- user preferences about behavior, communication, process, organization, or quality;
+- `AGENTS.md` creation, deletion, move, rename, or index contents.
 
-```powershell
-# Start everything (dev with hot-reload)
-make dev
+Update parent docs when parent-level structure, ownership, workflow, or child index changes. Update child docs when parent changes alter local rules. Remove stale or contradictory text immediately. Small edits that do not change behavior or contracts may leave docs unchanged, but the DOX pass still must happen.
 
-# Backend only
-make dev-backend
+## Hierarchy
 
-# Run tests
-make test
+- The root `AGENTS.md` is the DOX rail: project-wide instructions, global preferences, durable workflow rules, and the top-level Child DOX Index.
+- Child `AGENTS.md` files own domain-specific instructions and their own Child DOX Index.
+- Each parent explains what its direct children cover and what stays owned by the parent.
+- The closer a doc is to the work, the more specific and practical it must be.
 
-# Run seed
-make seed
+## Child Doc Shape
 
-# Build frontend
-make build-ui
+Create a child `AGENTS.md` when a folder becomes a durable boundary with its own purpose, rules, responsibilities, workflow, materials, or quality standards.
 
-# Stop
-make stop
-```
+Default section order:
 
----
+- Purpose
+- Ownership
+- Local Contracts
+- Work Guidance
+- Verification
+- Child DOX Index
 
-## Docker Stack
+## Style
 
-| Container | Image | Purpose |
-|---|---|---|
-| `patas_db` | postgres:16-alpine | Primary database |
-| `patas_redis` | redis:7-alpine | Cache + JWT blacklist |
-| `patas_backend` | patas-backend | FastAPI API |
-| `patas_frontend` | patas-frontend | React SPA |
-| `patas_nginx_lb` | patas-nginx-lb | Reverse proxy |
+- Keep docs concise, current, and operational.
+- Document stable contracts, not diary entries.
+- Put broad rules in parent docs and concrete details in child docs.
+- Prefer direct bullets with explicit names.
+- Do not duplicate rules across many files unless each scope needs a local version.
+- Delete stale notes instead of explaining history.
+- Trim obvious statements, repeated rules, misplaced detail, and warnings for risks that no longer exist.
 
-**API base URL:** `/api/v1` (proxied by nginx)
+## Closeout
 
-**Test credentials:**
-- `ana@patas.ao` / `patas2026` — vet
-- `carla@patas.ao` / `patas2026` — receptionist
+1. Re-check changed paths against the DOX chain.
+2. Update nearest owning docs and any affected parents or children.
+3. Refresh every affected Child DOX Index.
+4. Remove stale or contradictory text.
+5. Run existing verification when relevant.
+6. Report any docs intentionally left unchanged and why.
 
----
+## Project Purpose and Ownership
 
-## API Routes
+PATAS is a veterinary clinic management SaaS for the Angolan market, with Luanda and Benguela as the initial focus. The UI is Portuguese-first (`pt-AO` wording where applicable). The repository root is the current checkout; in this workspace it is `C:\Users\vladi\Documents\PATAS` and it is separate from `C:\Warehouse-Startup`.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/v1/auth/login` | Login |
-| POST | `/api/v1/auth/register` | Register |
-| POST | `/api/v1/auth/refresh` | Refresh token |
-| GET | `/api/v1/auth/me` | Current user |
-| GET/POST | `/api/v1/owners/` | Owners CRUD |
-| GET/POST/PATCH/DELETE | `/api/v1/pets/` | Pets CRUD |
-| GET/POST | `/api/v1/appointments/` | Appointments CRUD |
-| GET/POST | `/api/v1/treatments/` | Treatments CRUD |
-| GET/POST | `/api/v1/invoices/` | Invoices CRUD |
-| GET | `/api/v1/dashboard/stats` | Dashboard stats |
-| GET | `/health` | Health check |
+The root owns cross-domain architecture, repository-wide conventions, local development commands, API-wide contracts, and the top-level DOX index. Domain-specific rules belong in the nearest child document.
 
----
+## Repository Contracts
 
-## Data Model
+- Backend entry point: `backend/src/main.py`, exposed as `src.main:app`.
+- Backend imports use `from src...` when running from `backend`.
+- API base path: `/api/v1`; `/health` is the health endpoint.
+- All tenant data is scoped by the authenticated user’s `clinic_id`; cross-clinic access must not leak resources.
+- The backend uses FastAPI, SQLAlchemy 2, Pydantic 2, Alembic, JWT auth, Redis, and PostgreSQL in the stack; tests default to SQLite where configured.
+- The frontend is a React 18 + TypeScript + Vite SPA using Tailwind and shadcn-style UI primitives.
+- Shared TypeScript types live in `packages/shared-types` and are consumed by the frontend through `@patas/shared-types`.
+- The optional WhatsApp Cloud API adapter is disabled by default; webhook verification and provider signatures remain mandatory when enabled.
+- All user-facing UI strings go in `frontend/src/locales/pt.json` first; keep `en.json` aligned when adding supported UI text.
+- Public registration creates a clinic and its first administrator. Only administrators create additional clinic users; those users must change their temporary password before using protected workflows.
+- Protected endpoints accept access tokens only. Refresh re-loads the current user and rotates tokens; logout revokes both the presented access and refresh tokens.
+- Owners and pets use audited logical archive. Archived entities remain readable in history, are excluded from default lists, and cannot originate new consultations or invoices.
+- Appointment and waiting-room state changes go through the shared transition contract; terminal clinical/financial records are never physically deleted.
+- Agenda, dashboard, and waiting-room boundaries use `Africa/Luanda`; persisted instants use UTC.
+- The LAN pilot profile exposes HTTP/80 only, runs Alembic as a blocking one-shot service, and requires PostgreSQL backup plus a documented restore rehearsal before real data.
+- Do not add code comments unless the logic is non-obvious.
+- Never commit `.env`, `*.db`, `node_modules`, build caches, or generated artifacts unless an existing contract explicitly requires them.
 
-| Model | Key Fields |
-|---|---|
-| Clinic | id, name |
-| User | id, clinic_id, name, email, role (vet/receptionist/admin) |
-| Owner | id, clinic_id, name, phone, email, address, notes |
-| Pet | id, clinic_id, owner_id, name, species, breed, birth_date, weight, notes |
-| Appointment | id, clinic_id, pet_id, vet_id, owner_id, scheduled_at, status, reason, notes, **weight** |
-| Treatment | id, clinic_id, appointment_id, diagnosis, notes, prescription |
-| Invoice | id, clinic_id, owner_id, appointment_id, amount, status, description, reason |
+### Domain invariants
 
-**Appointment status:** `scheduled`, `completed`, `cancelled`, `no-show`
-**Invoice status:** `draft`, `paid`, `cancelled`
+- User roles are `admin`, `vet`, and `receptionist`.
+- Appointment statuses include `scheduled`, `in-progress`, `completed`, `cancelled`, and `no-show` where the current flow requires them.
+- Invoice statuses are defined by the current backend schemas; do not invent legacy values such as `PENDING` or `OVERDUE`.
+- Treatments belong to appointments through `appointment_id`; they do not have `pet_id`.
+- Invoices use `owner_id` and optional `appointment_id`; they do not have `pet_id`.
+- Do not call `.value` on a role that is already a plain string.
 
----
+## Local Verification
 
-## Known Bug Patterns — AVOID
+Run the smallest relevant existing checks, and run the broader checks when shared contracts or integration wiring change:
 
-- ❌ `user.role.value` when `role` is already a plain string
-- ❌ `Treatment.pet_id` — model has no `pet_id`, only `appointment_id`
-- ❌ `Invoice.pet_id` — model has `owner_id` and `appointment_id`, not `pet_id`
-- ❌ `InvoiceStatus.PENDING` / `OVERDUE` — only `DRAFT`, `PAID`, `CANCELLED`
-- ✅ Use `EnumClass.value` only when `role` is an actual Enum
+- Backend tests: from `backend`, `PYTHONPATH=. pytest tests/ -q` (PowerShell: `$env:PYTHONPATH='.'; pytest tests/ -q`).
+- Backend lint: from `backend`, `ruff check src/`.
+- Shared types: `npm run build --workspace=@patas/shared-types`.
+- Frontend type/build check: from `frontend`, `npm install` when dependencies are absent, then `npm run build`.
+- Full frontend workspace build: `npm run build` from the repository root.
+- Compose configuration: `docker compose config` for compose changes when Docker is available.
 
----
+## User Preferences
 
-## Key Conventions
+- Prefer concise, operational documentation.
+- Preserve unrelated user changes in a dirty worktree.
+- Communicate in Portuguese when interacting with the user unless the user requests another language.
+- Record durable behavior preferences here or in the relevant child `AGENTS.md`.
 
-- **No comments in code** unless logic is non-obvious
-- **Backend entry point:** `src.main:app` (not `app.main:app`)
-- **Import pattern:** `from src.models.xxx import ...`
-- **Test command:** `PYTHONPATH=/app pytest tests/ -q`
-- **i18n:** all UI strings go in `src/locales/pt.json` first
-- **Feature modules:** each domain has its own `features/<domain>/` directory with a barrel `index.ts`
-- **Never commit** `.env`, `*.db`, `node_modules/`
+## Child DOX Index
 
----
+The project is indexed as follows. Each listed document is the nearest contract for its subtree and contains its own index where deeper boundaries exist.
 
-## TODO (Next Up)
-
-1. **AGT invoicing** — generate AGT-compliant PDF invoices with QR code
-2. **Multicaixa payments** — ATM reference, Express, TPA integration
-3. **SMS reminders** — Africastalking or WhatsApp for appointment reminders
-4. **PWA / mobile-first** — lightweight mobile web for pet owners
-5. **Connect frontend API files** → use `@patas/shared-types` for types
-6. **Feature flags** — phase-gate Angola-specific payment features
-7. **VPS deployment** — domain + SSL via certbot on DigitalOcean
+- `.github/AGENTS.md` — CI workflows and repository automation.
+- `backend/AGENTS.md` — FastAPI backend boundary; indexes application code, migrations, tests, and backend scripts.
+- `docs/AGENTS.md` — durable product, setup, architecture, API documentation, and supporting design assets.
+- `frontend/AGENTS.md` — React/Vite application boundary; indexes frontend source and public/runtime assets.
+- `infra/AGENTS.md` — production/development Compose, nginx configuration, and database-init operations.
+- `nginx-lb/AGENTS.md` — standalone development reverse-proxy image and configuration.
+- `packages/AGENTS.md` — npm workspace packages; indexes shared types.
+- `scripts/AGENTS.md` — repository-level integration-test runners.

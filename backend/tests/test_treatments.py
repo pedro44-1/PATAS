@@ -1,4 +1,7 @@
-﻿def test_list_treatments_empty(client, vet_headers):
+﻿from datetime import UTC
+
+
+def test_list_treatments_empty(client, vet_headers):
     response = client.get("/api/v1/treatments/", headers=vet_headers)
     assert response.status_code == 200
     assert response.json() == []
@@ -57,10 +60,9 @@ def test_receptionist_cannot_create_treatment(client, receptionist_headers, appo
 
 def test_delete_treatment(client, vet_headers, treatment):
     response = client.delete(f"/api/v1/treatments/{treatment.id}", headers=vet_headers)
-    assert response.status_code == 200
-    assert response.json()["ok"] is True
+    assert response.status_code == 405
     response = client.get(f"/api/v1/treatments/{treatment.id}", headers=vet_headers)
-    assert response.status_code == 404
+    assert response.status_code == 200
 
 
 def test_receptionist_cannot_delete_treatment(client, receptionist_headers, treatment):
@@ -69,10 +71,11 @@ def test_receptionist_cannot_delete_treatment(client, receptionist_headers, trea
 
 
 def test_treatments_scoped_by_clinic(client, vet_headers, treatment, db_session):
+    from datetime import datetime, timedelta
+
+    from src.models.appointment import Appointment
     from src.models.clinic import Clinic
     from src.models.treatment import Treatment
-    from src.models.appointment import Appointment
-    from datetime import datetime, timezone, timedelta
     other_clinic = Clinic(name="Other Clinic")
     db_session.add(other_clinic)
     db_session.commit()
@@ -81,7 +84,7 @@ def test_treatments_scoped_by_clinic(client, vet_headers, treatment, db_session)
         pet_id=treatment.appointment.pet_id,
         vet_id=treatment.appointment.vet_id,
         owner_id=treatment.appointment.owner_id,
-        scheduled_at=datetime.now(timezone.utc) + timedelta(days=1),
+        scheduled_at=datetime.now(UTC) + timedelta(days=1),
     )
     db_session.add(other_appt)
     db_session.commit()

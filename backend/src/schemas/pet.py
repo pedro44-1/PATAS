@@ -1,5 +1,6 @@
-﻿from pydantic import BaseModel, Field
-from datetime import datetime, date
+﻿from datetime import date, datetime
+
+from pydantic import BaseModel, Field
 
 
 class PetCreate(BaseModel):
@@ -31,6 +32,8 @@ class PetResponse(BaseModel):
     birth_date: date | None
     weight: float | None
     notes: str | None
+    archived_at: datetime | None
+    archived_by_user_id: int | None
     created_at: datetime
 
     class Config:

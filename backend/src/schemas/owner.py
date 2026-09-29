@@ -1,5 +1,6 @@
-﻿from pydantic import BaseModel, EmailStr, Field
-from datetime import datetime
+﻿from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class OwnerCreate(BaseModel):
@@ -26,6 +27,8 @@ class OwnerResponse(BaseModel):
     email: str | None
     address: str | None
     notes: str | None
+    archived_at: datetime | None
+    archived_by_user_id: int | None
     created_at: datetime
 
     class Config:

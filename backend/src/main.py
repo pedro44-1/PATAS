@@ -1,16 +1,17 @@
-﻿import logging
+import logging
 from contextlib import asynccontextmanager
-from sqlalchemy import text
-from fastapi import FastAPI, Request, HTTPException, status
+
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
-from src.core.config import settings
-from src.core.database import engine, Base, SessionLocal
 from src.api import router as api_v1
+from src.core.config import settings
+from src.core.database import SessionLocal, engine
+from src.core.logging_config import setup_logging
 from src.models import *
 from src.services.cache import cache
-from src.core.logging_config import setup_logging
 
 setup_logging()
 
@@ -23,7 +24,6 @@ RATE_LIMIT_WINDOW = 60
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
     _seed_permissions()
     await cache.init()
     yield
@@ -32,9 +32,13 @@ async def lifespan(app: FastAPI):
 
 def _seed_permissions():
     from scripts.seed_permissions import seed_permissions
+    from src.models.clinic import Clinic
+    from src.services.clinical_catalog import ensure_clinic_defaults
     db = SessionLocal()
     try:
         seed_permissions(db)
+        for clinic in db.query(Clinic).all():
+            ensure_clinic_defaults(db, clinic.id)
     finally:
         db.close()
 
@@ -50,14 +54,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS_LIST,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
 )
 
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    if request.url.path.startswith("/health"):
+    if request.url.path.startswith(("/health", "/api/v1/integrations/whatsapp/webhook")):
         return await call_next(request)
 
     client_ip = request.client.host
@@ -83,7 +87,7 @@ async def limit_body_size(request: Request, call_next):
     if content_length and int(content_length) > MAX_BODY_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Corpo da requisiГ§ГЈo demasiado grande (mГЎximo 5MB)",
+            detail="Corpo da requisição demasiado grande (máximo 5MB)",
         )
     return await call_next(request)
 
@@ -94,7 +98,7 @@ async def global_exception_handler(request: Request, call_next):
         return await call_next(request)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -112,23 +116,26 @@ async def health():
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         db_ok = True
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 - dependency health probes fail with driver-specific errors
+        logger.warning("Database health check failed: %s", exc)
 
     redis_ok = False
     try:
         if cache.client:
             await cache.client.ping()
             redis_ok = True
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 - dependency health probes fail with client-specific errors
+        logger.warning("Redis health check failed: %s", exc)
 
     all_ok = db_ok and redis_ok
-    return {
-        "status": "ok" if all_ok else "degraded",
-        "app": "PATAS",
-        "checks": {
-            "database": "ok" if db_ok else "error",
-            "redis": "ok" if redis_ok else "error",
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if all_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "status": "ok" if all_ok else "degraded",
+            "app": "PATAS",
+            "checks": {
+                "database": "ok" if db_ok else "error",
+                "redis": "ok" if redis_ok else "error",
+            },
         },
-    }
+    )

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { petsApi, Pet, PetCreate } from "@/api/pets";
 import { ownersApi, Owner } from "@/api/owners";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormSelect } from "@/components/ui/form-select";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -15,7 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Search, PawPrint, ChevronRight, X } from "lucide-react";
+import { clinicDateInput } from "@/lib/date";
+import { Plus, Pencil, Archive, Search, PawPrint, ChevronRight, X } from "lucide-react";
 
 const SPECIES_OPTIONS = [
   { value: "Cão", label: "Cão", breeds: ["SRD", "Pastor Alemão", "Labrador", "Bulldog", "Rottweiler", "Golden Retriever", "Pitbull", "Beagle", "Dálmata", "Husky", "Boxer", "Poodle", "Chihuahua", "Bulldog Francês", "Cocker Spaniel", "Doberman", "Outro"] },
@@ -27,16 +30,15 @@ const SPECIES_OPTIONS = [
   { value: "Outro", label: "Outro", breeds: [] },
 ];
 
-function calculateAge(birthDate: string | null): string {
+function calculateAge(birthDate: string | null, translate: (key: string, options?: Record<string, unknown>) => string): string {
   if (!birthDate) return "—";
   const birth = new Date(birthDate);
   const today = new Date();
   const totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
-  if (totalMonths < 1) return "< 1 mês";
-  if (totalMonths < 12) return `${totalMonths} mê${totalMonths !== 1 ? "ses" : "s"}`;
+  if (totalMonths < 1) return translate("pets.age.lessThanMonth");
+  if (totalMonths < 12) return translate("pets.age.months", { count: totalMonths });
   const years = Math.floor(totalMonths / 12);
-  if (years === 1) return "1 ano";
-  return `${years} anos`;
+  return translate("pets.age.years", { count: years });
 }
 
 function speciesEmoji(species: string) {
@@ -49,6 +51,7 @@ function speciesEmoji(species: string) {
 
 export default function Pets() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [pets, setPets] = useState<Pet[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +59,7 @@ export default function Pets() {
   const [editing, setEditing] = useState<Pet | null>(null);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   // Form state
   const [form, setForm] = useState({
@@ -68,11 +72,13 @@ export default function Pets() {
   });
 
   function load() {
+    setError("");
     Promise.all([petsApi.list(), ownersApi.list()])
       .then(([petsRes, ownersRes]) => {
         setPets(petsRes.data);
         setOwners(ownersRes.data);
       })
+      .catch(() => setError(t("pets.error")))
       .finally(() => setLoading(false));
   }
 
@@ -117,6 +123,7 @@ export default function Pets() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+    setError("");
     try {
       const payload: PetCreate = {
         owner_id: form.owner_id,
@@ -133,15 +140,21 @@ export default function Pets() {
       }
       setShowForm(false);
       load();
-    } catch {} finally {
+    } catch {
+      setError(t("pets.error"));
+    } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Eliminar este animal?")) return;
-    await petsApi.delete(id);
-    load();
+    if (!confirm(t("pets.archiveConfirm"))) return;
+    try {
+      await petsApi.delete(id);
+      load();
+    } catch {
+      setError(t("pets.error"));
+    }
   }
 
   function getOwnerName(id: number) {
@@ -151,11 +164,11 @@ export default function Pets() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-dark-900">Animais</h2>
+          <h2 className="text-2xl font-extrabold text-dark-900">{t("pets.title")}</h2>
           <p className="text-dark-400 text-sm mt-0.5">
-            {pets.length} animal{pets.length !== 1 ? "is" : ""} registado{pets.length !== 1 ? "s" : ""}
+            {t("pets.count", { count: pets.length })}
           </p>
         </div>
         <Button
@@ -163,7 +176,7 @@ export default function Pets() {
           className="bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Novo Animal
+          {t("pets.new")}
         </Button>
       </div>
 
@@ -171,12 +184,14 @@ export default function Pets() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
         <Input
-          placeholder="Pesquisar por nome, espécie ou raça..."
+          placeholder={t("pets.search")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 h-11 rounded-xl bg-white border-dark-200"
         />
       </div>
+
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
 
       {/* Table */}
       <Card>
@@ -188,17 +203,17 @@ export default function Pets() {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-dark-400">
               <PawPrint className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-sm font-medium">Nenhum animal encontrado</p>
+              <p className="text-sm font-medium">{t("pets.noResults")}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-dark-100">
-                  <TableHead className="pl-5">Animal</TableHead>
-                  <TableHead>Espécie / Raça</TableHead>
-                  <TableHead>Idade</TableHead>
-                  <TableHead>Peso</TableHead>
-                  <TableHead className="pr-5 w-48 text-right">Ações</TableHead>
+                  <TableHead className="pl-5">{t("pets.table.animal")}</TableHead>
+                  <TableHead>{t("pets.table.speciesBreed")}</TableHead>
+                  <TableHead>{t("pets.table.age")}</TableHead>
+                  <TableHead>{t("pets.table.weight")}</TableHead>
+                  <TableHead className="pr-5 w-48 text-right">{t("pets.table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -224,7 +239,7 @@ export default function Pets() {
                       <div className="text-dark-400 text-xs">{p.breed ?? "—"}</div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-dark-600">{calculateAge(p.birth_date)}</span>
+                      <span className="text-sm text-dark-600">{calculateAge(p.birth_date, t)}</span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-dark-500">{p.weight ? `${p.weight} kg` : "—"}</span>
@@ -234,22 +249,24 @@ export default function Pets() {
                         <button
                           onClick={() => navigate(`/pets/${p.id}`)}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
-                          title="Ver histórico"
+                          title={t("pets.history")}
                         >
-                          Ver
+                          {t("pets.table.view")}
                           <ChevronRight className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => openEdit(p)}
+                          title={t("common.edit")}
                           className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(p.id)}
+                          title={t("common.archive")}
                           className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Archive className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </TableCell>
@@ -275,10 +292,10 @@ export default function Pets() {
             <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
               <div>
                 <h2 className="font-bold text-dark-900">
-                  {editing ? "Editar Animal" : "Novo Animal"}
+                  {editing ? t("pets.edit") : t("pets.new")}
                 </h2>
                 <p className="text-dark-400 text-xs mt-0.5">
-                  {editing ? `A editar ${editing.name}` : "Registar um novo animal"}
+                  {editing ? t("pets.editing", { name: editing.name }) : t("pets.createHint")}
                 </p>
               </div>
               <button
@@ -294,69 +311,63 @@ export default function Pets() {
               {/* Owner */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-dark-600">
-                  Dono *
+                  {t("pets.form.owner")} *
                 </Label>
-                <select
-                  value={form.owner_id}
-                  onChange={(e) => setForm({ ...form, owner_id: Number(e.target.value) })}
-                  className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all"
+                <FormSelect
+                  value={form.owner_id || null}
+                  onValueChange={(value) => setForm({ ...form, owner_id: Number(value) })}
+                  options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
+                  placeholder={t("pets.form.selectOwner")}
+                  className="h-11 border-dark-200 bg-white"
                   required
-                >
-                  <option value={0}>Selecionar dono</option>
-                  {owners.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Name + Species */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">Nome *</Label>
+                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.name")} *</Label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Nome do animal"
+                    placeholder={t("pets.form.namePlaceholder")}
                     required
                     className="h-11 rounded-xl"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">Espécie *</Label>
-                  <select
+                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.species")} *</Label>
+                  <FormSelect
                     value={form.species}
-                    onChange={(e) => setForm({ ...form, species: e.target.value, breed: "" })}
-                    className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
+                    onValueChange={(value) => setForm({ ...form, species: value, breed: "" })}
+                    options={SPECIES_OPTIONS.map(({ value }) => ({ value, label: t(`pets.species.${value}`) }))}
+                    className="h-11 border-dark-200 bg-white"
                     required
-                  >
-                    {SPECIES_OPTIONS.map(({ value, label }) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
 
               {/* Breed */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-dark-600">
-                  Raça {breedOptions.length > 0 && `— ${breedOptions.length} opções`}
+                  {t("pets.form.breed")} {breedOptions.length > 0 && `— ${t("pets.form.breedOptions", { count: breedOptions.length })}`}
                 </Label>
                 {breedOptions.length > 0 ? (
-                  <select
+                  <FormSelect
                     value={form.breed}
-                    onChange={(e) => setForm({ ...form, breed: e.target.value })}
-                    className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
-                  >
-                    <option value="">Selecionar raça</option>
-                    {breedOptions.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
+                    onValueChange={(value) => setForm({ ...form, breed: value })}
+                    options={[
+                      { value: "", label: t("pets.form.selectBreed") },
+                      ...breedOptions.map((breed) => ({ value: breed, label: breed })),
+                    ]}
+                    placeholder={t("pets.form.selectBreed")}
+                    className="h-11 border-dark-200 bg-white"
+                  />
                 ) : (
                   <Input
                     value={form.breed}
                     onChange={(e) => setForm({ ...form, breed: e.target.value })}
-                    placeholder="Descrição da espécie"
+                    placeholder={t("pets.form.breedPlaceholder")}
                     className="h-11 rounded-xl"
                   />
                 )}
@@ -366,18 +377,18 @@ export default function Pets() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-dark-600">
-                    Data de Nascimento
+                    {t("pets.form.birthDate")}
                   </Label>
                   <input
                     type="date"
                     value={form.birth_date}
-                    max={new Date().toISOString().split("T")[0]}
+                    max={clinicDateInput()}
                     onChange={(e) => setForm({ ...form, birth_date: e.target.value })}
                     className="flex h-11 w-full rounded-xl border border-dark-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">Peso (kg)</Label>
+                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.weight")}</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -386,7 +397,7 @@ export default function Pets() {
                     onChange={(e) =>
                       setForm({ ...form, weight: e.target.value || undefined })
                     }
-                    placeholder="Ex: 12.5"
+                    placeholder={t("pets.form.weightPlaceholder")}
                     className="h-11 rounded-xl"
                   />
                 </div>
@@ -396,9 +407,9 @@ export default function Pets() {
               {form.birth_date && (
                 <div className="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
                   <p className="text-brand-700 text-sm font-semibold">
-                    {calculateAge(form.birth_date)} de idade
+                    {t("pets.form.ageDisplay", { age: calculateAge(form.birth_date, t) })}
                   </p>
-                  <p className="text-brand-500 text-xs mt-0.5">
+                  <p className="text-brand-600 text-xs mt-0.5">
                     {new Date(form.birth_date).toLocaleDateString("pt-AO", { year: "numeric", month: "long", day: "numeric" })}
                   </p>
                 </div>
@@ -412,7 +423,7 @@ export default function Pets() {
                   onClick={() => setShowForm(false)}
                   className="rounded-xl h-11"
                 >
-                  Cancelar
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -422,12 +433,12 @@ export default function Pets() {
                   {saving ? (
                     <span className="flex items-center gap-2">
                       <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      A guardar...
+                      {t("common.saving")}
                     </span>
                   ) : editing ? (
-                    "Guardar Alterações"
+                    t("pets.saveChanges")
                   ) : (
-                    "Registar Animal"
+                    t("pets.create")
                   )}
                 </Button>
               </div>

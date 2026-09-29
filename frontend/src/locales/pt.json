@@ -4,13 +4,18 @@
     "tagline": "Clínica Veterinária"
   },
   "nav": {
+    "main": "Operação",
+    "system": "Sistema",
     "dashboard": "Painel",
+    "waitingRoom": "Sala de espera",
+    "clinicalAppointment": "Atendimento clínico",
     "appointments": "Consultas",
     "owners": "Donos",
     "pets": "Animais",
     "treatments": "Tratamentos",
     "invoices": "Faturas",
     "settings": "Configurações",
+    "users": "Utilizadores",
     "logout": "Terminar sessão"
   },
   "auth": {
@@ -20,7 +25,39 @@
     "loginButton": "Entrar na conta",
     "loggingIn": "A iniciar sessão...",
     "loginError": "Email ou palavra-passe incorretos",
-    "demoUsers": "Utilizadores de demonstração"
+    "demoUsers": "Utilizadores de demonstração",
+    "welcome": "Bem-vindo de volta",
+    "accessHint": "Aceda ao espaço de gestão da sua clínica.",
+    "demoHint": "Acesso rápido de demonstração",
+    "showPassword": "Mostrar palavra-passe",
+    "hidePassword": "Ocultar palavra-passe",
+    "secureAccess": "Acesso seguro para a sua equipa",
+    "location": "PATAS · Luanda, Angola",
+    "noClinic": "Ainda não tem uma clínica?",
+    "registerClinic": "Criar clínica",
+    "registerTitle": "Criar a sua clínica",
+    "registerHint": "Registe a clínica e a primeira conta de administrador.",
+    "registerError": "Não foi possível criar a clínica.",
+    "clinicName": "Nome da clínica",
+    "adminName": "Nome do administrador",
+    "passwordRules": "Mínimo de 8 caracteres, com uma maiúscula e um número.",
+    "createClinic": "Criar clínica",
+    "backToLogin": "Voltar ao início de sessão",
+    "passwordChangeTitle": "Defina a sua palavra-passe",
+    "passwordChangeHint": "A conta foi criada com uma palavra-passe temporária. Altere-a para continuar.",
+    "currentPassword": "Palavra-passe temporária",
+    "newPassword": "Nova palavra-passe",
+    "confirmPassword": "Confirmar nova palavra-passe",
+    "passwordMismatch": "As novas palavras-passe não coincidem.",
+    "passwordChangeError": "Não foi possível alterar a palavra-passe.",
+    "changePassword": "Alterar palavra-passe",
+    "logoutInstead": "Terminar sessão"
+  },
+  "apiErrors": {
+    "sessionExpired": "A sessão expirou. Inicie sessão novamente.",
+    "forbidden": "Não tem permissão para executar esta ação.",
+    "conflict": "A ação entra em conflito com o estado atual. Atualize os dados e tente novamente.",
+    "validation": "Existem dados inválidos ou em falta. Reveja o formulário."
   },
   "dashboard": {
     "title": "Painel",
@@ -29,6 +66,28 @@
     "greetingEvening": "Boa noite",
     "upcoming": "Próximas consultas",
     "noUpcoming": "Nenhuma consulta agendada",
+    "viewAll": "Ver todas",
+    "schedule": "Agendar nova consulta",
+    "todayAppointments": "Consultas de hoje",
+    "defaultReason": "Consulta",
+    "cards": {
+      "pets": "Animais registados",
+      "owners": "Donos",
+      "today": "Consultas hoje",
+      "upcoming": "Próximas consultas"
+    },
+    "quickActions": {
+      "title": "Ações rápidas",
+      "appointment": "Agendar consulta",
+      "pet": "Registar animal",
+      "owner": "Adicionar dono",
+      "invoice": "Criar fatura"
+    },
+    "summary": {
+      "title": "Resumo do dia",
+      "count_one": "{{count}} consulta",
+      "count_other": "{{count}} consultas"
+    },
     "stats": {
       "pets": "Animais",
       "owners": "Donos",
@@ -42,12 +101,17 @@
     "edit": "Editar Consulta",
     "noResults": "Nenhuma consulta para este dia",
     "create": "Registar Consulta",
+    "saving": "A agendar...",
     "form": {
       "animal": "Animal",
       "selectAnimal": "Selecionar animal",
+      "vet": "Veterinário",
+      "selectVet": "Selecionar veterinário",
       "dateTime": "Data e Hora",
       "reason": "Motivo da Consulta",
       "reasonPlaceholder": "Ex: Vacinação, Consulta geral, Exame de sangue",
+      "service": "Tipo de serviço",
+      "selectService": "Selecionar serviço",
       "notes": "Notas",
       "notesPlaceholder": "Notas adicionais",
       "duration": "Duração",
@@ -64,14 +128,20 @@
     },
     "status": {
       "scheduled": "Agendada",
+      "in-progress": "Em atendimento",
       "completed": "Concluída",
       "cancelled": "Cancelada",
       "no-show": "Faltou"
     },
     "actions": {
+      "start": "Iniciar",
       "complete": "Concluir",
-      "cancel": "Cancelar"
-    }
+      "cancel": "Cancelar",
+      "noShow": "Faltou"
+    },
+    "cancelReason": "Indique o motivo do cancelamento:",
+    "noShowReason": "Indique o motivo da falta:",
+    "error": "Não foi possível atualizar a consulta."
   },
   "owners": {
     "title": "Donos",
@@ -80,8 +150,14 @@
     "noResults": "Nenhum dono encontrado",
     "clearSearch": "Limpar pesquisa",
     "search": "Pesquisar por nome, email ou telefone...",
-    "count": "{{count}} dono registado",
-    "count_plural": "{{count}} donos registados",
+    "count_one": "{{count}} dono registado",
+    "count_other": "{{count}} donos registados",
+    "create": "Criar dono",
+    "createHint": "Registar um novo dono",
+    "editing": "A editar {{name}}",
+    "saveChanges": "Guardar alterações",
+    "archiveConfirm": "Arquivar este dono e os seus animais? O histórico será preservado.",
+    "error": "Não foi possível atualizar o dono.",
     "form": {
       "name": "Nome completo",
       "phone": "Telefone",
@@ -107,8 +183,22 @@
     "edit": "Editar Animal",
     "noResults": "Nenhum animal encontrado",
     "search": "Pesquisar por nome, espécie ou raça...",
-    "count": "{{count}} animal registado",
-    "count_plural": "{{count}} animais registados",
+    "count_one": "{{count}} animal registado",
+    "count_other": "{{count}} animais registados",
+    "create": "Registar Animal",
+    "createHint": "Registar um novo animal",
+    "editing": "A editar {{name}}",
+    "saveChanges": "Guardar Alterações",
+    "archiveConfirm": "Arquivar este animal? O histórico será preservado.",
+    "error": "Não foi possível atualizar o animal.",
+    "history": "Ver histórico",
+    "age": {
+      "lessThanMonth": "< 1 mês",
+      "months_one": "{{count}} mês",
+      "months_other": "{{count}} meses",
+      "years_one": "{{count}} ano",
+      "years_other": "{{count}} anos"
+    },
     "form": {
       "owner": "Dono",
       "selectOwner": "Selecionar dono",
@@ -137,6 +227,8 @@
     },
     "detail": {
       "title": "Detalhes do Animal",
+      "notFound": "Animal não encontrado.",
+      "backToList": "Voltar à lista",
       "tabs": {
         "appointments": "Consultas",
         "weight": "Peso",
@@ -155,10 +247,12 @@
       "diagnostics": {
         "noData": "Nenhum diagnóstico registado",
         "noDataHint": "Os diagnósticos são registados após as consultas",
-        "prescription": "Prescrição"
+        "prescription": "Prescrição",
+        "unspecified": "Diagnóstico não especificado"
       },
       "appointments": {
-        "noData": "Nenhuma consulta registada"
+        "noData": "Nenhuma consulta registada",
+        "encounter": "Atendimento"
       },
       "treatments": {
         "noData": "Nenhum tratamento registado"
@@ -182,6 +276,16 @@
     "new": "Novo Tratamento",
     "edit": "Editar Tratamento",
     "noResults": "Nenhum tratamento registado",
+    "count_one": "{{count}} tratamento registado",
+    "count_other": "{{count}} tratamentos registados",
+    "create": "Criar Tratamento",
+    "saving": "A guardar...",
+    "saveChanges": "Guardar alterações",
+    "createHint": "Registar um novo tratamento",
+    "editHint": "A editar tratamento",
+    "deleteConfirm": "Eliminar este tratamento?",
+    "appointmentFallback": "Consulta",
+    "createAppointment": "Criar nova consulta",
     "form": {
       "appointment": "Consulta",
       "selectAppointment": "Selecionar consulta",
@@ -189,6 +293,19 @@
       "diagnosisPlaceholder": "Resultado do diagnóstico",
       "prescription": "Prescrição / Medicação",
       "prescriptionPlaceholder": "Medicação prescrita"
+    },
+    "voice": {
+      "start": "Ditar",
+      "stop": "Parar ditado",
+      "recording": "A ouvir",
+      "listening": "A transcrever o que diz...",
+      "unsupported": "A transcrição por voz não é suportada neste navegador.",
+      "error": "Não foi possível transcrever o áudio. Verifique a permissão do microfone."
+    },
+    "newAppointment": {
+      "title": "Nova Consulta",
+      "hint": "Crie uma consulta e associe-a a este tratamento.",
+      "create": "Criar e selecionar"
     },
     "table": {
       "date": "Data",
@@ -202,15 +319,22 @@
     "title": "Faturas",
     "new": "Nova Fatura",
     "noResults": "Nenhuma fatura",
+    "count_one": "{{count}} fatura",
+    "count_other": "{{count}} faturas",
+    "createHint": "Emitir uma nova fatura",
+    "issue": "Emitir Fatura",
+    "issuing": "A emitir...",
+    "cancelReason": "Indique o motivo do cancelamento:",
+    "error": "Não foi possível atualizar a fatura.",
     "pendingAlert": {
       "label": "Total pendente de cobrança",
-      "hint": "{{amount}} Kz em {{count}} factura não paga",
-      "count_singular": "factura",
-      "count_plural": "facturas"
+      "hint_one": "{{amount}} Kz em {{count}} fatura não paga",
+      "hint_other": "{{amount}} Kz em {{count}} faturas não pagas"
     },
     "filter": {
       "all": "Todas",
       "draft": "Rascunho",
+      "sent": "Enviadas",
       "paid": "Pagas",
       "cancelled": "Canceladas"
     },
@@ -233,12 +357,230 @@
     },
     "status": {
       "draft": "Rascunho",
+      "sent": "Enviada",
       "paid": "Paga",
       "cancelled": "Cancelada"
     },
     "actions": {
-      "markPaid": "Paga"
+      "send": "Enviar",
+      "sendHint": "Enviar para o sistema de pagamentos",
+      "markPaid": "Paga",
+      "markPaidHint": "Marcar como paga"
     }
+  },
+  "clinical": {
+    "timeline": {
+      "title": "Linha clínica",
+      "empty": "Ainda não existem registos clínicos",
+      "appointment": "Consulta",
+      "treatment": "Tratamento",
+      "vet": "Veterinário: {{name}}"
+    },
+    "form": {
+      "vet": "Veterinário responsável",
+      "selectVet": "Selecionar veterinário",
+      "appointment": "Consulta associada",
+      "noAppointment": "Sem consulta associada",
+      "notes": "Notas"
+    },
+    "vaccinations": {
+      "title": "Vacinas",
+      "item": "Vacina",
+      "new": "Nova vacina",
+      "empty": "Nenhuma vacina registada",
+      "form": {
+        "name": "Nome da vacina",
+        "dose": "Dose",
+        "date": "Data de administração",
+        "lot": "Lote",
+        "expiry": "Validade",
+        "nextDose": "Próxima dose"
+      }
+    },
+    "medications": {
+      "title": "Medicamentos",
+      "item": "Medicamento",
+      "new": "Novo medicamento",
+      "empty": "Nenhum medicamento registado",
+      "form": {
+        "name": "Nome do medicamento",
+        "dosage": "Dosagem",
+        "frequency": "Frequência",
+        "route": "Via de administração",
+        "start": "Data de início",
+        "end": "Data de fim",
+        "instructions": "Instruções"
+      }
+    },
+    "status": {
+      "administered": "Administrada",
+      "active": "Ativo",
+      "completed": "Concluído",
+      "cancelled": "Cancelado",
+      "voided": "Anulado"
+    },
+    "actions": {
+      "void": "Anular",
+      "voidPrompt": "Indique o motivo obrigatório para anular este registo:",
+      "complete": "Concluir",
+      "cancel": "Cancelar"
+    },
+    "errors": {
+      "save": "Não foi possível guardar o registo clínico.",
+      "void": "Não foi possível anular o registo clínico."
+    }
+  },
+  "waitingRoom": {
+    "eyebrow": "Operação clínica",
+    "title": "Sala de espera",
+    "subtitle": "Acompanhe chegadas, chamadas e atendimentos da clínica.",
+    "all": "Todas",
+    "newWalkIn": "Nova entrada",
+    "queueTitle": "Entradas de hoje",
+    "queueHint": "Filtre por serviço ou pesquise pelo animal e dono.",
+    "search": "Pesquisar animal ou dono...",
+    "empty": "Nenhuma entrada na sala de espera",
+    "defaultService": "Consulta",
+    "defaultReason": "Atendimento clínico",
+    "scheduledTitle": "Consultas agendadas",
+    "scheduledHint": "Registe a chegada quando o cliente entrar na clínica.",
+    "scheduledEmpty": "Não existem consultas agendadas fora da fila.",
+    "unknownPet": "Animal não identificado",
+    "walkInTitle": "Nova entrada sem marcação",
+    "walkInHint": "Crie uma consulta e coloque o animal na fila numa só operação.",
+    "create": "Adicionar à fila",
+    "status": {
+      "waiting": "A aguardar",
+      "called": "Chamado",
+      "in-progress": "Em atendimento",
+      "completed": "Concluído",
+      "cancelled": "Cancelado",
+      "no-show": "Faltou"
+    },
+    "actions": {
+      "checkIn": "Registar chegada",
+      "call": "Chamar",
+      "start": "Iniciar",
+      "complete": "Concluir",
+      "noShow": "Faltou",
+      "cancel": "Cancelar",
+      "cancelPrompt": "Indique o motivo do cancelamento:",
+      "noShowPrompt": "Indique o motivo da falta:",
+      "openClinical": "Abrir atendimento"
+    },
+    "form": {
+      "pet": "Animal",
+      "selectPet": "Selecionar animal",
+      "vet": "Veterinário",
+      "selectVet": "Selecionar veterinário",
+      "service": "Serviço",
+      "selectService": "Selecionar serviço",
+      "reason": "Motivo",
+      "reasonPlaceholder": "Ex.: tosse, dor, vacinação",
+      "room": "Sala",
+      "roomPlaceholder": "Ex.: Consultório 1",
+      "message": "Mensagem",
+      "messagePlaceholder": "Nota para a equipa"
+    },
+    "errors": {
+      "load": "Não foi possível carregar a sala de espera.",
+      "save": "Não foi possível adicionar a entrada.",
+      "transition": "Não foi possível atualizar o estado da entrada."
+    }
+  },
+  "clinicalAppointment": {
+    "responsible": "Veterinário responsável",
+    "save": "Guardar atendimento",
+    "start": "Iniciar atendimento",
+    "complete": "Concluir consulta",
+    "saved": "Atendimento guardado.",
+    "started": "Atendimento iniciado.",
+    "completed": "Consulta concluída.",
+    "examTitle": "Reconhecimento físico",
+    "examHint": "Registe apenas os achados relevantes; os restantes ficam como não avaliados.",
+    "abnormal": "achados anormais",
+    "finding": {
+      "notEvaluated": "Não avaliado",
+      "normal": "Normal",
+      "abnormal": "Anormal",
+      "note": "Observação específica"
+    },
+    "historyTitle": "Anamnese e diagnóstico",
+    "anamnesis": "Anamnese",
+    "consultationType": "Tipo de consulta",
+    "referringVet": "Veterinário referenciador",
+    "noReferringVet": "Sem referenciador",
+    "types": {
+      "normal": "Normal",
+      "urgent": "Urgente",
+      "return": "Retorno"
+    },
+    "diagnosis": "Diagnóstico",
+    "notes": "Notas clínicas",
+    "prescriptionTitle": "Prescrição estruturada",
+    "prescriptionHint": "Associe medicamentos à consulta e mantenha o texto livre abaixo.",
+    "addMedication": "Adicionar medicamento",
+    "noMedications": "Ainda não existem medicamentos nesta prescrição.",
+    "newMedication": "Novo medicamento",
+    "medication": {
+      "name": "Medicamento",
+      "dosage": "Dosagem",
+      "frequency": "Frequência",
+      "route": "Via",
+      "start": "Início",
+      "end": "Fim",
+      "instructions": "Instruções"
+    },
+    "freePrescription": "Orientações e prescrição livre",
+    "freePrescriptionPlaceholder": "Indicações adicionais para o dono...",
+    "petSummary": "Resumo do animal",
+    "openPet": "Abrir ficha completa",
+    "openEncounter": "Abrir atendimento",
+    "errors": {
+      "load": "Não foi possível carregar o atendimento clínico.",
+      "start": "Não foi possível iniciar o atendimento.",
+      "save": "Não foi possível guardar o atendimento.",
+      "complete": "Não foi possível concluir a consulta.",
+      "notFound": "Consulta ou animal não encontrado."
+    }
+  },
+  "settings": {
+    "title": "Configurações",
+    "subtitle": "Preferências funcionais da clínica",
+    "clinic": "Clínica",
+    "clinicValue": "Clínica associada ao utilizador #{{id}}",
+    "currency": "Moeda",
+    "currencyValue": "AOA — Kwanza angolano",
+    "timezone": "Fuso horário",
+    "timezoneValue": "Africa/Luanda",
+    "catalog": {
+      "servicesTitle": "Tipos de serviço",
+      "servicesHint": "Categorias usadas na agenda e sala de espera.",
+      "newService": "Novo serviço",
+      "servicePlaceholder": "Ex.: Internamento",
+      "examTitle": "Catálogo de exame físico",
+      "examHint": "Sistemas e achados usados pelos veterinários.",
+      "newSystem": "Novo sistema",
+      "systemPlaceholder": "Ex.: Avaliação neurológica",
+      "renamePrompt": "Novo nome do serviço:",
+      "findingPrompt": "Nome do novo achado clínico:"
+    }
+  },
+  "users": {
+    "title": "Utilizadores",
+    "subtitle": "Equipa com acesso à clínica",
+    "restricted": "Apenas administradores podem gerir utilizadores.",
+    "empty": "Nenhum utilizador encontrado",
+    "create": "Adicionar utilizador",
+    "createTitle": "Nova conta da equipa",
+    "createHint": "Defina uma palavra-passe temporária. A alteração será obrigatória no primeiro acesso.",
+    "name": "Nome",
+    "email": "Email",
+    "role": "Perfil",
+    "temporaryPassword": "Palavra-passe temporária",
+    "passwordPending": "Alteração de palavra-passe pendente",
+    "created": "Utilizador criado com sucesso.",
+    "createError": "Não foi possível criar o utilizador."
   },
   "common": {
     "save": "Guardar",
@@ -254,7 +596,21 @@
     "back": "Voltar",
     "to": "a",
     "min": "min",
-    "kg": "kg"
+    "kg": "kg",
+    "openMenu": "Abrir menu",
+    "closeMenu": "Fechar menu",
+    "useLightTheme": "Usar tema claro",
+    "useDarkTheme": "Usar tema escuro",
+    "saving": "A guardar...",
+    "add": "Adicionar",
+    "archived": "Arquivado",
+    "archive": "Arquivar",
+    "close": "Fechar"
+  },
+  "roles": {
+    "admin": "Administrador",
+    "vet": "Veterinário",
+    "receptionist": "Rececionista"
   },
   "form": {
     "required": "*",
@@ -271,10 +627,15 @@
   },
   "status": {
     "scheduled": "Agendada",
+    "called": "Chamado",
+    "in-progress": "Em atendimento",
     "completed": "Concluída",
     "cancelled": "Cancelada",
     "draft": "Rascunho",
     "paid": "Paga",
-    "no-show": "Faltou"
+    "no-show": "Faltou",
+    "administered": "Administrada",
+    "active": "Ativo",
+    "voided": "Anulado"
   }
 }

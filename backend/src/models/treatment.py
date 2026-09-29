@@ -1,6 +1,7 @@
-﻿from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+﻿from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 
 from src.core.database import Base
 
@@ -14,7 +15,12 @@ class Treatment(Base):
     diagnosis = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     prescription = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    anamnesis = Column(Text, nullable=True)
+    consultation_type = Column(String(50), nullable=False, default="normal")
+    referring_vet_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     clinic = relationship("Clinic", back_populates="treatments")
     appointment = relationship("Appointment", back_populates="treatment")
+    referring_vet = relationship("User", foreign_keys=[referring_vet_id])

@@ -8,6 +8,15 @@ export interface UserResponse {
   name: string;
   email: string;
   role: UserRole;
+  clinic_name: string;
+  must_change_password: boolean;
+}
+
+export interface ClinicRegistration {
+  clinic_name: string;
+  name: string;
+  email: string;
+  password: string;
 }
 
 export interface UserCreate {
@@ -30,9 +39,20 @@ export interface Token {
   access_token: string;
   refresh_token: string;
   token_type: string;
+  must_change_password: boolean;
 }
 
 export interface TokenRefresh {
+  refresh_token: string;
+}
+
+export interface LogoutRequest {
+  refresh_token: string;
+}
+
+export interface PasswordChange {
+  current_password: string;
+  new_password: string;
   refresh_token: string;
 }
 

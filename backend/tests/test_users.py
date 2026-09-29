@@ -28,3 +28,28 @@ def test_receptionist_cannot_update_user_role(client, receptionist_headers, vet_
         json={"role": "receptionist"},
     )
     assert response.status_code == 403
+
+
+def test_admin_creates_user_in_own_clinic_with_temporary_password(client, vet_headers, clinic):
+    response = client.post("/api/v1/users/", headers=vet_headers, json={
+        "name": "Novo Veterinário",
+        "email": "new.vet@test.com",
+        "password": "Temporary1",
+        "role": "vet",
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["clinic_id"] == clinic.id
+    assert data["role"] == "vet"
+    assert data["must_change_password"] is True
+    assert "password" not in data
+
+
+def test_receptionist_cannot_create_user(client, receptionist_headers):
+    response = client.post("/api/v1/users/", headers=receptionist_headers, json={
+        "name": "Blocked",
+        "email": "blocked@test.com",
+        "password": "Temporary1",
+        "role": "vet",
+    })
+    assert response.status_code == 403

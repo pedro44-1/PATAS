@@ -1,6 +1,7 @@
-﻿from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+﻿from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 
 from src.core.database import Base
 
@@ -15,7 +16,9 @@ class Owner(Base):
     email = Column(String(255), nullable=True)
     address = Column(String(500), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    archived_at = Column(DateTime, nullable=True, index=True)
+    archived_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     clinic = relationship("Clinic", back_populates="owners")
     pets = relationship("Pet", back_populates="owner")

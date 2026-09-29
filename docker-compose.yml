@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16-alpine
@@ -33,11 +31,28 @@ services:
       timeout: 3s
       retries: 5
 
-  backend:
+  migrate:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    image: patas-backend:local
+    command: alembic upgrade head
+    container_name: patas_migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://patas:${POSTGRES_PASSWORD:-patas_dev_password}@db:5432/patas
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-in-production}
+      APP_ENV: ${APP_ENV:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+
+  backend:
+    image: patas-backend:local
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--proxy-headers", "--forwarded-allow-ips=*"]
     container_name: patas_backend
     restart: unless-stopped
     environment:
@@ -46,10 +61,17 @@ services:
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-in-production}
       APP_ENV: ${APP_ENV:-development}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:80}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      WHATSAPP_GRAPH_API_VERSION: ${WHATSAPP_GRAPH_API_VERSION:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_REQUEST_TIMEOUT_SECONDS: ${WHATSAPP_REQUEST_TIMEOUT_SECONDS:-10}
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -63,12 +85,10 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: patas_frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: http://localhost:80
     depends_on:
       - backend
 
@@ -80,28 +100,10 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      # 443 mapped only when SSL certs are provisioned by certbot
-      # Uncomment next line for production with HTTPS:
-      # - "443:443"
     depends_on:
       - backend
       - frontend
-    volumes:
-      - ./nginx-lb/nginx-ssl.conf:/etc/nginx/nginx.conf
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-
-  certbot:
-    image: certbot/certbot:latest
-    container_name: patas_certbot
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-    entrypoint: >
-      sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done"
 
 volumes:
   db_data:
   redis_data:
-  certbot_www:
-  certbot_conf:

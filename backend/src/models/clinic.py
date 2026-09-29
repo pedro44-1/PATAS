@@ -1,6 +1,7 @@
-﻿from sqlalchemy import Column, Integer, String, DateTime
+﻿from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 
 from src.core.database import Base
 
@@ -13,7 +14,7 @@ class Clinic(Base):
     address = Column(String(500), nullable=True)
     phone = Column(String(50), nullable=True)
     email = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     users = relationship("User", back_populates="clinic")
     owners = relationship("Owner", back_populates="clinic")
@@ -21,3 +22,8 @@ class Clinic(Base):
     appointments = relationship("Appointment", back_populates="clinic")
     treatments = relationship("Treatment", back_populates="clinic")
     invoices = relationship("Invoice", back_populates="clinic")
+    service_types = relationship("ServiceType", back_populates="clinic")
+    waiting_room_entries = relationship("WaitingRoomEntry", back_populates="clinic")
+    exam_systems = relationship("ClinicalExamSystem", back_populates="clinic")
+    exam_findings = relationship("ClinicalExamFinding", back_populates="clinic")
+    exam_observations = relationship("ClinicalExamObservation", back_populates="clinic")
