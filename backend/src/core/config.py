@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     WHATSAPP_APP_SECRET: SecretStr = SecretStr("")
     WHATSAPP_VERIFY_TOKEN: SecretStr = SecretStr("")
     WHATSAPP_REQUEST_TIMEOUT_SECONDS: float = 10.0
+    BILLING_PROVIDER: str = "mock"
+    VENDAS_BASE_URL: str = ""
+    VENDAS_API_KEY: SecretStr = SecretStr("")
+    VENDAS_REQUEST_TIMEOUT_SECONDS: float = 10.0
+    VENDAS_OPERATION_TYPE: str = ""
+    VENDAS_DEFAULT_VAT_PROFILE_CODE: str = ""
+    VENDAS_CASH_SESSION_ID: str = ""
 
     @property
     def CORS_ORIGINS_LIST(self) -> list[str]:
@@ -64,6 +71,20 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(
                     "WhatsApp integration is enabled but required settings are missing: "
+                    + ", ".join(missing)
+                )
+
+        if self.BILLING_PROVIDER == "vendas":
+            required = {
+                "VENDAS_BASE_URL": self.VENDAS_BASE_URL,
+                "VENDAS_API_KEY": self.VENDAS_API_KEY.get_secret_value(),
+                "VENDAS_OPERATION_TYPE": self.VENDAS_OPERATION_TYPE,
+                "VENDAS_DEFAULT_VAT_PROFILE_CODE": self.VENDAS_DEFAULT_VAT_PROFILE_CODE,
+            }
+            missing = [name for name, value in required.items() if not value]
+            if missing:
+                raise ValueError(
+                    "Vendas billing integration is enabled but required settings are missing: "
                     + ", ".join(missing)
                 )
 

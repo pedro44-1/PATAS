@@ -37,9 +37,20 @@ export interface AppointmentCreate {
   status_reason?: string;
 }
 
+export interface AppointmentListFilters {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export const appointmentsApi = {
-  list: (date?: string) =>
-    api.get<Appointment[]>("/appointments/", { params: date ? { date } : {} }),
+  list: (filter?: string | AppointmentListFilters) => {
+    const params = typeof filter === "string"
+      ? { date: filter }
+      : filter
+        ? { date_from: filter.dateFrom, date_to: filter.dateTo }
+        : {};
+    return api.get<Appointment[]>("/appointments/", { params });
+  },
   vets: () => api.get<VetOption[]>("/appointments/vets"),
   create: (data: AppointmentCreate) =>
     api.post<Appointment>("/appointments/", data),

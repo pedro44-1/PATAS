@@ -1,24 +1,132 @@
+import json
+from datetime import UTC, datetime
+from decimal import ROUND_HALF_UP, Decimal
+from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, get_current_user, require_permission
 from src.models.appointment import Appointment
-from src.models.invoice import Invoice, InvoiceStatus, InvoiceSyncStatus
+from src.models.clinic import Clinic
+from src.models.invoice import (
+    Invoice,
+    InvoiceLine,
+    InvoiceLineKind,
+    InvoiceStatus,
+    InvoiceSyncStatus,
+)
 from src.models.owner import Owner
 from src.schemas.invoice import InvoiceCreate, InvoiceResponse, InvoiceUpdate
 from src.services.audit import audit
-from src.services.billing import billing_adapter
+from src.services.billing import (
+    build_billing_payload,
+    build_billing_preview_payload,
+    get_billing_adapter,
+)
 
 router = APIRouter()
 
 INVOICE_TRANSITIONS = {
-    InvoiceStatus.DRAFT: {InvoiceStatus.SENT, InvoiceStatus.PAID, InvoiceStatus.CANCELLED},
-    InvoiceStatus.SENT: {InvoiceStatus.PAID, InvoiceStatus.CANCELLED},
+    InvoiceStatus.DRAFT: {InvoiceStatus.SENT, InvoiceStatus.CANCELLED},
+    InvoiceStatus.SENT: {InvoiceStatus.CANCELLED},
     InvoiceStatus.PAID: set(),
     InvoiceStatus.CANCELLED: set(),
 }
+CENT = Decimal("0.01")
+
+
+def _money(value: Decimal) -> Decimal:
+    return value.quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def _add_line(
+    invoice: Invoice,
+    clinic_id: int,
+    description: str,
+    quantity: Decimal,
+    unit_price: Decimal,
+    tax_rate: Decimal,
+    code: str | None = None,
+    vat_profile_code: str | None = None,
+    kind: InvoiceLineKind = InvoiceLineKind.SERVICE,
+    unit: str = "UN",
+) -> None:
+    subtotal = _money(quantity * unit_price)
+    tax_amount = _money(subtotal * tax_rate / Decimal(100))
+    invoice.lines.append(InvoiceLine(
+        clinic_id=clinic_id,
+        description=description,
+        code=code,
+        vat_profile_code=vat_profile_code,
+        kind=kind,
+        unit=unit,
+        quantity=quantity,
+        unit_price=unit_price,
+        tax_rate=tax_rate,
+        subtotal=subtotal,
+        tax_amount=tax_amount,
+        total=subtotal + tax_amount,
+    ))
+
+
+def _recalculate(invoice: Invoice) -> None:
+    invoice.subtotal = sum((line.subtotal for line in invoice.lines), Decimal(0))
+    invoice.tax_total = sum((line.tax_amount for line in invoice.lines), Decimal(0))
+    invoice.amount = float(_money(invoice.subtotal + invoice.tax_total))
+
+
+def _find_invoice(db: Session, invoice_id: int, clinic_id: int) -> Invoice:
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.clinic_id == clinic_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+    return invoice
+
+
+def _hydrate_billing_snapshot(db: Session, invoice: Invoice) -> None:
+    clinic = db.query(Clinic).filter(Clinic.id == invoice.clinic_id).first()
+    owner = db.query(Owner).filter(
+        Owner.id == invoice.owner_id,
+        Owner.clinic_id == invoice.clinic_id,
+    ).first()
+    invoice.issuer_name = invoice.issuer_name or clinic.name
+    invoice.issuer_nif = invoice.issuer_nif or clinic.nif
+    invoice.issuer_address = invoice.issuer_address or clinic.address
+    invoice.issuer_phone = invoice.issuer_phone or clinic.phone
+    invoice.issuer_store_external_id = (
+        invoice.issuer_store_external_id or clinic.billing_store_external_id
+    )
+    invoice.customer_name = invoice.customer_name or owner.name
+    invoice.customer_nif = invoice.customer_nif or owner.nif
+    invoice.customer_address = invoice.customer_address or owner.address
+    invoice.customer_phone = invoice.customer_phone or owner.phone
+    invoice.customer_email = invoice.customer_email or owner.email
+    invoice.billing_external_id = (
+        invoice.billing_external_id or f"patas-{invoice.clinic_id}-invoice-{invoice.id}"
+    )
+
+
+def _provider_error_code(exc: httpx.HTTPStatusError) -> str | None:
+    try:
+        data = exc.response.json()
+    except ValueError:
+        return None
+    detail = data.get("detail")
+    if isinstance(detail, dict):
+        return detail.get("code")
+    return data.get("code")
+
+
+def _clear_quote(invoice: Invoice) -> None:
+    invoice.quote_id = None
+    invoice.quote_expires_at = None
+    invoice.quote_vat_configuration_version = None
+    invoice.quote_calculation_digest = None
+    invoice.quote_payable = None
+    invoice.quote_snapshot = None
+    invoice.idempotency_key = None
 
 
 @router.get("/", response_model=list[InvoiceResponse])
@@ -56,18 +164,69 @@ def create_invoice(
     ).first()
     if not owner:
         raise HTTPException(status_code=404, detail="Dono não encontrado")
+    if not owner.nif:
+        raise HTTPException(status_code=422, detail="O NIF do dono é obrigatório para faturação")
 
     if data.appointment_id:
         appointment = db.query(Appointment).filter(
-            Appointment.id == data.appointment_id, Appointment.clinic_id == current_user.clinic_id
+            Appointment.id == data.appointment_id,
+            Appointment.clinic_id == current_user.clinic_id,
         ).first()
         if not appointment:
             raise HTTPException(status_code=404, detail="Consulta não encontrada")
         if appointment.owner_id != data.owner_id:
             raise HTTPException(status_code=422, detail="A consulta não pertence ao dono indicado")
 
-    invoice = Invoice(clinic_id=current_user.clinic_id, **data.model_dump())
+    clinic = db.query(Clinic).filter(Clinic.id == current_user.clinic_id).first()
+    invoice = Invoice(
+        clinic_id=current_user.clinic_id,
+        owner_id=data.owner_id,
+        appointment_id=data.appointment_id,
+        amount=0,
+        subtotal=0,
+        tax_total=0,
+        description=data.description,
+        document_type=data.document_type,
+        payment_method=data.payment_method,
+        due_at=data.due_at,
+        issuer_name=clinic.name,
+        issuer_nif=clinic.nif,
+        issuer_address=clinic.address,
+        issuer_phone=clinic.phone,
+        issuer_store_external_id=clinic.billing_store_external_id,
+        customer_name=owner.name,
+        customer_nif=owner.nif,
+        customer_address=owner.address,
+        customer_phone=owner.phone,
+        customer_email=owner.email,
+    )
+    if data.items:
+        for item in data.items:
+            _add_line(
+                invoice,
+                current_user.clinic_id,
+                item.description,
+                item.quantity,
+                item.unit_price,
+                item.tax_rate,
+                item.code,
+                item.vat_profile_code,
+                item.kind,
+                item.unit,
+            )
+    else:
+        _add_line(
+            invoice,
+            current_user.clinic_id,
+            data.description or "Serviços veterinários",
+            Decimal(1),
+            data.amount or Decimal(0),
+            Decimal(0),
+        )
+    _recalculate(invoice)
     db.add(invoice)
+    db.flush()
+    invoice.billing_external_id = f"patas-{invoice.clinic_id}-invoice-{invoice.id}"
     db.commit()
     db.refresh(invoice)
     audit(
@@ -77,25 +236,15 @@ def create_invoice(
         action="CREATE",
         resource="invoice",
         resource_id=invoice.id,
-        details={"amount": invoice.amount, "owner_id": invoice.owner_id},
+        details={"amount": invoice.amount, "owner_id": invoice.owner_id, "lines": len(invoice.lines)},
         ip_address=request.client.host if request else None,
     )
     return invoice
 
 
 @router.get("/{invoice_id}", response_model=InvoiceResponse)
-def get_invoice(
-    invoice_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    inv = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.clinic_id == current_user.clinic_id,
-    ).first()
-    if not inv:
-        raise HTTPException(status_code=404, detail="Fatura não encontrada")
-    return inv
+def get_invoice(invoice_id: int, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    return _find_invoice(db, invoice_id, current_user.clinic_id)
 
 
 @router.patch("/{invoice_id}", response_model=InvoiceResponse)
@@ -106,37 +255,117 @@ def update_invoice(
     db: Session = Depends(get_db),
     request: Request = None,
 ):
-    inv = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.clinic_id == current_user.clinic_id,
-    ).first()
-    if not inv:
-        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+    invoice = _find_invoice(db, invoice_id, current_user.clinic_id)
     updates = data.model_dump(exclude_unset=True)
-    if inv.status in {InvoiceStatus.PAID, InvoiceStatus.CANCELLED} and updates:
+    if invoice.status in {InvoiceStatus.PAID, InvoiceStatus.CANCELLED} and updates:
         raise HTTPException(status_code=409, detail="Faturas em estado terminal não podem ser alteradas")
     target_status = updates.get("status")
-    if target_status and target_status != inv.status and target_status not in INVOICE_TRANSITIONS[inv.status]:
+    if target_status == InvoiceStatus.PAID:
+        raise HTTPException(
+            status_code=409,
+            detail="O pagamento só pode ser confirmado pelo software de faturação",
+        )
+    if target_status and target_status != invoice.status and target_status not in INVOICE_TRANSITIONS[invoice.status]:
         raise HTTPException(status_code=409, detail="Transição de estado da fatura inválida")
-    if inv.status != InvoiceStatus.DRAFT and set(updates) - {"status", "reason"}:
+    if invoice.status != InvoiceStatus.DRAFT and set(updates) - {"status", "reason", "payment_method"}:
         raise HTTPException(status_code=409, detail="Apenas faturas em rascunho podem ser corrigidas")
     if target_status == InvoiceStatus.CANCELLED and not updates.get("reason"):
         raise HTTPException(status_code=422, detail="O motivo é obrigatório ao cancelar uma fatura")
+    if target_status == InvoiceStatus.CANCELLED and invoice.external_reference:
+        raise HTTPException(
+            status_code=409,
+            detail="O documento já foi emitido no Vendas; a anulação externa ainda não está configurada",
+        )
+    content_changes = set(updates) & {"amount", "description"}
+    if content_changes and invoice.sync_attempts and invoice.idempotency_key:
+        raise HTTPException(
+            status_code=409,
+            detail="Existe uma emissão pendente; repita a emissão antes de alterar a fatura",
+        )
+    if content_changes:
+        _clear_quote(invoice)
+    amount = updates.pop("amount", None)
+    if amount is not None:
+        if len(invoice.lines) != 1:
+            raise HTTPException(status_code=409, detail="Altere os itens da fatura em vez do total")
+        invoice.lines[0].unit_price = amount
+        invoice.lines[0].subtotal = _money(invoice.lines[0].quantity * amount)
+        invoice.lines[0].tax_amount = _money(
+            invoice.lines[0].subtotal * invoice.lines[0].tax_rate / Decimal(100)
+        )
+        invoice.lines[0].total = invoice.lines[0].subtotal + invoice.lines[0].tax_amount
+        _recalculate(invoice)
     for key, value in updates.items():
-        setattr(inv, key, value)
+        setattr(invoice, key, value)
     db.commit()
-    db.refresh(inv)
+    db.refresh(invoice)
+    audit(db, clinic_id=current_user.clinic_id, user_id=current_user.id, action="UPDATE", resource="invoice", resource_id=invoice.id, details=updates, ip_address=request.client.host if request else None)
+    return invoice
+
+
+@router.post("/{invoice_id}/preview", response_model=InvoiceResponse)
+def preview_invoice(
+    invoice_id: int,
+    current_user: CurrentUser = Depends(require_permission("invoice:write")),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    invoice = _find_invoice(db, invoice_id, current_user.clinic_id)
+    if invoice.status != InvoiceStatus.DRAFT:
+        raise HTTPException(status_code=409, detail="Apenas rascunhos podem obter uma prévia fiscal")
+    if invoice.sync_attempts > 0 and invoice.idempotency_key:
+        raise HTTPException(
+            status_code=409,
+            detail="Existe uma emissão pendente; repita a emissão com a mesma chave antes de recalcular",
+        )
+    _hydrate_billing_snapshot(db, invoice)
+    preview_key = str(uuid4())
+    try:
+        result = get_billing_adapter().preview_invoice(
+            build_billing_preview_payload(invoice), preview_key
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        code = _provider_error_code(exc)
+        if code == "VAT_PROFILE_REQUIRED":
+            raise HTTPException(
+                status_code=422,
+                detail="Configure o perfil de IVA dos produtos ou serviços no Vendas",
+            ) from exc
+        raise HTTPException(
+            status_code=502,
+            detail="O Vendas não conseguiu calcular a prévia fiscal",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível contactar o Vendas para calcular a prévia fiscal",
+        ) from exc
+    invoice.quote_id = result.quote_id
+    invoice.quote_expires_at = result.expires_at
+    invoice.quote_vat_configuration_version = result.vat_configuration_version
+    invoice.quote_calculation_digest = result.calculation_digest
+    invoice.quote_payable = result.payable
+    invoice.quote_snapshot = json.dumps(result.snapshot, ensure_ascii=False)
+    invoice.idempotency_key = str(uuid4())
+    invoice.sync_status = InvoiceSyncStatus.PENDING
+    invoice.last_sync_error = None
+    db.commit()
+    db.refresh(invoice)
     audit(
         db,
         clinic_id=current_user.clinic_id,
         user_id=current_user.id,
-        action="UPDATE",
+        action="PREVIEW",
         resource="invoice",
-        resource_id=inv.id,
-        details=updates,
+        resource_id=invoice.id,
+        details={"quote_id": invoice.quote_id, "sync_status": invoice.sync_status.value},
         ip_address=request.client.host if request else None,
     )
-    return inv
+    return invoice
 
 
 @router.post("/{invoice_id}/sync", response_model=InvoiceResponse)
@@ -146,60 +375,96 @@ def sync_invoice(
     db: Session = Depends(get_db),
     request: Request = None,
 ):
-    inv = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.clinic_id == current_user.clinic_id,
-    ).first()
-    if not inv:
-        raise HTTPException(status_code=404, detail="Fatura não encontrada")
-    if inv.status in {InvoiceStatus.CANCELLED, InvoiceStatus.PAID}:
+    invoice = _find_invoice(db, invoice_id, current_user.clinic_id)
+    if invoice.sync_status == InvoiceSyncStatus.SYNCED and invoice.external_reference:
+        return invoice
+    if invoice.status in {InvoiceStatus.CANCELLED, InvoiceStatus.PAID}:
         raise HTTPException(status_code=409, detail="Faturas em estado terminal não podem ser sincronizadas")
-    if inv.sync_status == InvoiceSyncStatus.SYNCED and inv.external_reference:
-        return inv
-    result = billing_adapter.create_invoice(inv)
-    inv.external_reference = result.external_reference
-    inv.sync_status = InvoiceSyncStatus.SYNCED
-    if inv.status == InvoiceStatus.DRAFT:
-        inv.status = InvoiceStatus.SENT
+    if not invoice.quote_id or not invoice.quote_expires_at:
+        raise HTTPException(
+            status_code=409,
+            detail="Calcule uma prévia fiscal no Vendas antes de emitir",
+        )
+    expires_at = invoice.quote_expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at <= datetime.now(UTC) and invoice.sync_attempts == 0:
+        _clear_quote(invoice)
+        db.commit()
+        raise HTTPException(status_code=409, detail="A prévia fiscal expirou; calcule uma nova")
+    _hydrate_billing_snapshot(db, invoice)
+    invoice.idempotency_key = invoice.idempotency_key or str(uuid4())
+    db.flush()
+    try:
+        adapter = get_billing_adapter()
+        result = adapter.emit_invoice(build_billing_payload(invoice))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        code = _provider_error_code(exc)
+        if code in {"QUOTE_NOT_FOUND", "QUOTE_EXPIRED", "QUOTE_MISMATCH", "QUOTE_STALE"}:
+            _clear_quote(invoice)
+            invoice.sync_status = InvoiceSyncStatus.PENDING
+            invoice.last_sync_error = "A prévia fiscal mudou ou expirou"
+            db.commit()
+            raise HTTPException(
+                status_code=409,
+                detail="A prévia fiscal mudou ou expirou; calcule uma nova antes de emitir",
+            ) from exc
+        invoice.sync_status = InvoiceSyncStatus.FAILED
+        invoice.sync_attempts += 1
+        invoice.last_sync_at = datetime.now(UTC)
+        invoice.last_sync_error = "O software de faturação não aceitou o pedido"
+        db.commit()
+        raise HTTPException(status_code=502, detail=invoice.last_sync_error) from exc
+    except httpx.HTTPError as exc:
+        invoice.sync_status = InvoiceSyncStatus.FAILED
+        invoice.sync_attempts += 1
+        invoice.last_sync_at = datetime.now(UTC)
+        invoice.last_sync_error = "O software de faturação não aceitou o pedido"
+        db.commit()
+        raise HTTPException(status_code=502, detail=invoice.last_sync_error) from exc
+    invoice.external_reference = result.external_reference
+    invoice.document_number = result.document_number
+    invoice.document_url = result.document_url
+    invoice.series = result.series or invoice.series
+    invoice.sync_status = InvoiceSyncStatus.SYNCED
+    invoice.sync_attempts += 1
+    invoice.last_sync_at = datetime.now(UTC)
+    invoice.last_sync_error = None
+    invoice.provider_status = result.status
+    invoice.provider_mode = result.mode
+    invoice.issued_at = datetime.now(UTC)
+    if invoice.document_type.value == "FR":
+        invoice.status = InvoiceStatus.PAID
+        invoice.paid_at = invoice.issued_at
+    elif invoice.status == InvoiceStatus.DRAFT:
+        invoice.status = InvoiceStatus.SENT
     db.commit()
-    db.refresh(inv)
-    audit(
-        db,
-        clinic_id=current_user.clinic_id,
-        user_id=current_user.id,
-        action="SYNC",
-        resource="invoice",
-        resource_id=inv.id,
-        details={"external_reference": inv.external_reference, "adapter": "mock"},
-        ip_address=request.client.host if request else None,
-    )
-    return inv
+    db.refresh(invoice)
+    audit(db, clinic_id=current_user.clinic_id, user_id=current_user.id, action="SYNC", resource="invoice", resource_id=invoice.id, details={"external_reference": invoice.external_reference, "adapter": adapter.name}, ip_address=request.client.host if request else None)
+    return invoice
 
 
 @router.get("/{invoice_id}/sync-status")
-def get_invoice_sync_status(
-    invoice_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    inv = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.clinic_id == current_user.clinic_id,
-    ).first()
-    if not inv:
-        raise HTTPException(status_code=404, detail="Fatura não encontrada")
-    external_status = billing_adapter.get_status(inv.external_reference) if inv.external_reference else None
-    return {"invoice_id": inv.id, "sync_status": inv.sync_status.value, "external_status": external_status}
+def get_invoice_sync_status(invoice_id: int, current_user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    invoice = _find_invoice(db, invoice_id, current_user.clinic_id)
+    external_status = None
+    if invoice.external_reference:
+        try:
+            external_status = get_billing_adapter().get_status(invoice.external_reference)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except httpx.HTTPError as exc:
+            raise HTTPException(status_code=502, detail="Não foi possível reconciliar com o software de faturação") from exc
+        invoice.provider_status = external_status
+        invoice.last_sync_at = datetime.now(UTC)
+        db.commit()
+    return {"invoice_id": invoice.id, "sync_status": invoice.sync_status.value, "external_status": external_status}
 
 
 @router.delete("/{invoice_id}")
-def delete_invoice(
-    invoice_id: int,
-    current_user: CurrentUser = Depends(require_permission("invoice:write")),
-    db: Session = Depends(get_db),
-    request: Request = None,
-):
-    raise HTTPException(
-        status_code=405,
-        detail="Faturas não podem ser eliminadas; cancele a fatura com um motivo",
-    )
+def delete_invoice(invoice_id: int, current_user: CurrentUser = Depends(require_permission("invoice:write"))):
+    raise HTTPException(status_code=405, detail="Faturas não podem ser eliminadas; cancele a fatura com um motivo")

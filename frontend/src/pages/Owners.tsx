@@ -5,6 +5,7 @@ import { apiErrorMessage } from "@/api/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormError } from "@/components/ui/form-error";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -28,15 +29,20 @@ export default function Owners() {
     phone: "",
     email: "",
     address: "",
+    nif: "",
     notes: "",
   });
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
   function load() {
     setLoading(true);
-    ownersApi.list().then((r) => setOwners(r.data)).finally(() => setLoading(false));
+    ownersApi.list()
+      .then((r) => setOwners(r.data))
+      .catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "owners.error")))
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, []);
@@ -50,7 +56,8 @@ export default function Owners() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ name: "", phone: "", email: "", address: "", notes: "" });
+    setForm({ name: "", phone: "", email: "", address: "", nif: "", notes: "" });
+    setFormError("");
     setShowForm(true);
   }
 
@@ -61,15 +68,17 @@ export default function Owners() {
       phone: owner.phone ?? "",
       email: owner.email ?? "",
       address: owner.address ?? "",
+      nif: owner.nif ?? "",
       notes: owner.notes ?? "",
     });
+    setFormError("");
     setShowForm(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError("");
+    setFormError("");
     try {
       if (editing) {
         await ownersApi.update(editing.id, form);
@@ -79,7 +88,7 @@ export default function Owners() {
       setShowForm(false);
       load();
     } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "owners.error"));
+      setFormError(apiErrorMessage(requestError, t, "owners.error"));
     } finally {
       setSaving(false);
     }
@@ -245,6 +254,7 @@ export default function Owners() {
 
             {/* Modal body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <FormError message={formError} />
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-dark-600">{t("owners.form.name")} *</Label>
                 <Input
@@ -280,6 +290,16 @@ export default function Owners() {
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   placeholder={t("owners.form.addressPlaceholder")}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.nif")}</Label>
+                <Input
+                  value={form.nif}
+                  onChange={(e) => setForm({ ...form, nif: e.target.value })}
+                  placeholder={t("owners.form.nifPlaceholder")}
+                  maxLength={30}
                   className="h-11 rounded-xl"
                 />
               </div>

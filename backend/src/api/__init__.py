@@ -4,6 +4,7 @@ from src.api import (
     appointments,
     auth,
     clinical,
+    clinics,
     dashboard,
     encounters,
     exam_catalog,
@@ -20,6 +21,7 @@ from src.api import (
 router = APIRouter()
 
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
+router.include_router(clinics.router, prefix="/clinics", tags=["clinics"])
 router.include_router(owners.router, prefix="/owners", tags=["owners"])
 router.include_router(pets.router, prefix="/pets", tags=["pets"])
 router.include_router(appointments.router, prefix="/appointments", tags=["appointments"])

@@ -16,7 +16,7 @@ export default function Register() {
   const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ clinic_name: "", name: "", email: "", password: "" });
+  const [form, setForm] = useState({ clinic_name: "", clinic_nif: "", name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -50,6 +50,7 @@ export default function Register() {
         </div>
         <form onSubmit={submit} className="page-card space-y-5 p-6 sm:p-7">
           <div className="space-y-2"><Label htmlFor="clinic-name">{t("auth.clinicName")}</Label><Input id="clinic-name" value={form.clinic_name} onChange={(event) => setForm({ ...form, clinic_name: event.target.value })} maxLength={255} required autoFocus /></div>
+          <div className="space-y-2"><Label htmlFor="clinic-nif">{t("auth.clinicNif")}</Label><Input id="clinic-nif" value={form.clinic_nif} onChange={(event) => setForm({ ...form, clinic_nif: event.target.value })} maxLength={30} required /></div>
           <div className="space-y-2"><Label htmlFor="admin-name">{t("auth.adminName")}</Label><Input id="admin-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} maxLength={100} required /></div>
           <div className="space-y-2"><Label htmlFor="register-email">{t("auth.email")}</Label><Input id="register-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required /></div>
           <div className="space-y-2"><Label htmlFor="register-password">{t("auth.password")}</Label><Input id="register-password" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} minLength={8} maxLength={128} required /><p className="text-xs text-muted-foreground">{t("auth.passwordRules")}</p></div>

@@ -117,7 +117,7 @@ def test_me_authenticated(client, vet_headers, vet_user):
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == "vet@test.com"
-    assert data["role"] == "admin"
+    assert data["role"] == "vet"
 
 
 def test_me_unauthenticated(client):
@@ -148,8 +148,8 @@ def test_refresh_token_cannot_authenticate_protected_endpoint(client, vet_user):
     assert response.status_code == 401
 
 
-def test_temporary_password_change_and_logout_revoke_both_tokens(client, vet_headers):
-    created = client.post("/api/v1/users/", headers=vet_headers, json={
+def test_temporary_password_change_and_logout_revoke_both_tokens(client, admin_headers):
+    created = client.post("/api/v1/users/", headers=admin_headers, json={
         "name": "Dra. Temporária",
         "email": "temporary@test.com",
         "password": "Temporary1",

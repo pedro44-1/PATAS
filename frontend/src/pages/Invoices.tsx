@@ -1,81 +1,98 @@
-import { useEffect, useState } from "react";
-import { invoicesApi, Invoice, InvoiceStatus } from "@/api/invoices";
-import { ownersApi, Owner } from "@/api/owners";
+import { useEffect, useMemo, useState } from "react";
+import { FormError } from "@/components/ui/form-error";
 import { useTranslation } from "react-i18next";
+import { Calculator, ExternalLink, FileText, Plus, Send, Trash2, X } from "lucide-react";
+
+import { appointmentsApi, Appointment } from "@/api/appointments";
+import { apiErrorMessage } from "@/api/errors";
+import { Invoice, invoicesApi, InvoiceStatus, PaymentMethod } from "@/api/invoices";
+import { Owner, ownersApi } from "@/api/owners";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { FormSelect } from "@/components/ui/form-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FormSelect } from "@/components/ui/form-select";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { Plus, FileText, Check, X } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-function statusConfig(status: InvoiceStatus, label: string) {
-  if (status === "sent")
-    return { label, bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
-  if (status === "paid")
-    return { label, bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
-  if (status === "cancelled")
-    return { label, bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" };
-  return { label, bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
-}
+type DraftLine = { description: string; code?: string; vat_profile_code?: string; kind: "SERVICE" | "PRODUCT"; unit: string; quantity: number; unit_price: number; tax_rate: number };
+type InvoiceForm = { owner_id: number; appointment_id: number | null; document_type: "FT" | "FR"; payment_method: PaymentMethod; items: DraftLine[] };
+
+const emptyLine = (): DraftLine => ({ description: "", kind: "SERVICE", unit: "UN", quantity: 1, unit_price: 0, tax_rate: 0 });
+const emptyForm = (): InvoiceForm => ({ owner_id: 0, appointment_id: null, document_type: "FT", payment_method: "tpa", items: [emptyLine()] });
+
+const quoteExpiryTime = (value: string) => new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`).getTime();
+
+const hasValidQuote = (invoice: Invoice) => Boolean(
+  invoice.quote_id
+  && invoice.quote_expires_at
+  && quoteExpiryTime(invoice.quote_expires_at) > Date.now(),
+);
 
 export default function Invoices() {
   const { t } = useTranslation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterStatus, setFilterStatus] = useState("");
-  const [form, setForm] = useState({ owner_id: 0, amount: 0, description: "" });
+  const [form, setForm] = useState<InvoiceForm>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const statusOptions = ["", "draft", "sent", "paid", "cancelled"];
+  const [formError, setFormError] = useState("");
 
   function load() {
+    setLoading(true);
     setError("");
     Promise.all([
       invoicesApi.list(filterStatus ? { status: filterStatus } : undefined),
       ownersApi.list(),
-    ])
-      .then(([iRes, oRes]) => {
-        setInvoices(iRes.data);
-        setOwners(oRes.data);
-      })
-      .catch(() => setError(t("invoices.error")))
+      appointmentsApi.list(),
+    ]).then(([invoiceResponse, ownerResponse, appointmentResponse]) => {
+      setInvoices(invoiceResponse.data);
+      setOwners(ownerResponse.data);
+      setAppointments(appointmentResponse.data);
+    }).catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "invoices.error")))
       .finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [filterStatus]);
 
-  const pendingTotal = invoices
-    .filter((i) => i.status === "draft")
-    .reduce((sum, i) => sum + i.amount, 0);
+  const owner = owners.find((item) => item.id === form.owner_id);
+  const ownerAppointments = appointments.filter((item) => item.owner_id === form.owner_id);
+  const subtotal = useMemo(
+    () => form.items.reduce((result, item) => result + item.quantity * item.unit_price, 0),
+    [form.items],
+  );
+  const pendingInvoices = invoices.filter((item) => item.status === "sent");
+  const pendingTotal = pendingInvoices.reduce((sum, item) => sum + Math.round(Number(item.quote_payable ?? item.amount) * 100), 0) / 100;
 
   function openCreate() {
-    setForm({ owner_id: owners[0]?.id ?? 0, amount: 0, description: "" });
+    setForm({ ...emptyForm(), owner_id: owners[0]?.id ?? 0 });
     setShowForm(true);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function updateLine(index: number, patch: Partial<DraftLine>) {
+    setForm((current) => ({ ...current, items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) }));
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setSaving(true);
-    setError("");
+    setFormError("");
     try {
-      await invoicesApi.create({ ...form, amount: Number(form.amount) });
+      await invoicesApi.create({
+        owner_id: form.owner_id,
+        appointment_id: form.appointment_id ?? undefined,
+        document_type: form.document_type,
+        payment_method: form.document_type === "FR" ? form.payment_method : undefined,
+        items: form.items,
+      });
       setShowForm(false);
       load();
-    } catch {
-      setError(t("invoices.error"));
+    } catch (requestError: unknown) {
+      setFormError(apiErrorMessage(requestError, t, "invoices.error"));
     } finally {
       setSaving(false);
     }
@@ -87,8 +104,8 @@ export default function Invoices() {
       if (status === "cancelled" && !reason?.trim()) return;
       await invoicesApi.update(id, { status, reason });
       load();
-    } catch {
-      setError(t("invoices.error"));
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "invoices.error"));
     }
   }
 
@@ -96,250 +113,75 @@ export default function Invoices() {
     try {
       await invoicesApi.sync(id);
       load();
-    } catch {
-      setError(t("invoices.error"));
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "invoices.error"));
     }
   }
 
-  function getOwnerName(id: number) {
-    return owners.find((o) => o.id === id)?.name ?? "—";
+  async function handlePreview(id: number) {
+    try {
+      await invoicesApi.preview(id);
+      load();
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "invoices.previewError"));
+    }
   }
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-dark-900">{t("invoices.title")}</h2>
-          <p className="text-dark-400 text-sm mt-0.5">
-            {t("invoices.count", { count: invoices.length })}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <FormSelect
-            value={filterStatus}
-            onValueChange={setFilterStatus}
-            options={statusOptions.map((value) => ({ value, label: t(`invoices.filter.${value || "all"}`) }))}
-            className="w-auto min-w-36 border-dark-200 bg-white text-dark-700"
-          />
-          <Button
-            onClick={openCreate}
-            className="bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {t("invoices.new")}
-          </Button>
-        </div>
+  return <div className="space-y-6 animate-fade-in">
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      <div><h2 className="text-2xl font-extrabold text-dark-900">{t("invoices.title")}</h2><p className="mt-0.5 text-sm text-dark-400">{t("invoices.count", { count: invoices.length })}</p></div>
+      <div className="flex items-center gap-3">
+        <FormSelect value={filterStatus} onValueChange={setFilterStatus} options={["", "draft", "sent", "paid", "cancelled"].map((value) => ({ value, label: t(`invoices.filter.${value || "all"}`) }))} className="min-w-36" />
+        <Button onClick={openCreate}><Plus className="mr-2 size-4" />{t("invoices.new")}</Button>
       </div>
-
-      {/* Pending alert */}
-      {pendingTotal > 0 && (
-        <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-base flex-shrink-0">
-            📄
-          </div>
-          <div className="flex-1">
-            <p className="text-amber-800 text-sm font-semibold">
-              {t("invoices.pendingAlert.label")}
-            </p>
-            <p className="text-amber-600 text-xs">
-              {t("invoices.pendingAlert.hint", {
-                amount: pendingTotal.toLocaleString("pt-AO"),
-                count: invoices.filter((i) => i.status === "draft").length,
-              })}
-            </p>
-          </div>
-          <span className="text-amber-800 font-extrabold text-lg">
-            {pendingTotal.toLocaleString("pt-AO")} Kz
-          </span>
-        </div>
-      )}
-
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-16">
-              <div className="w-6 h-6 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin" />
-            </div>
-          ) : invoices.length === 0 ? (
-            <div className="flex flex-col items-center py-16 text-dark-400">
-              <FileText className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-sm font-medium">{t("invoices.noResults")}</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-b border-dark-100">
-                  <TableHead className="pl-5 w-16">{t("invoices.table.number")}</TableHead>
-                  <TableHead>{t("invoices.table.owner")}</TableHead>
-                  <TableHead>{t("invoices.table.value")}</TableHead>
-                  <TableHead>{t("invoices.table.status")}</TableHead>
-                  <TableHead>{t("invoices.table.description")}</TableHead>
-                  <TableHead className="pr-5 w-48 text-right">{t("invoices.table.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((inv) => {
-                  const cfg = statusConfig(inv.status, t(`invoices.status.${inv.status}`));
-                  return (
-                    <TableRow key={inv.id}>
-                      <TableCell className="pl-5">
-                        <span className="font-bold text-sm text-dark-500">#{inv.id}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium text-sm text-dark-900">
-                          {getOwnerName(inv.owner_id)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-bold text-sm text-dark-900">
-                          {inv.amount.toLocaleString("pt-AO")} Kz
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-                            cfg.bg,
-                            cfg.text
-                          )}
-                        >
-                          <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
-                          {cfg.label}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-dark-500 max-w-40 block truncate">
-                          {inv.description ?? "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="pr-5">
-                        {inv.status === "draft" || inv.status === "sent" ? (
-                          <div className="flex justify-end gap-2">
-                            {inv.status === "draft" && <button
-                              onClick={() => handleSync(inv.id)}
-                              className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition-colors"
-                              title={t("invoices.actions.sendHint")}
-                            >
-                              {t("invoices.actions.send")}
-                            </button>}
-                            {inv.status === "draft" && <button
-                              onClick={() => handleStatus(inv.id, "paid")}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
-                              title={t("invoices.actions.markPaidHint")}
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              {t("invoices.actions.markPaid")}
-                            </button>}
-                            <button
-                              onClick={() => handleStatus(inv.id, "cancelled")}
-                              className="p-1.5 rounded-lg bg-dark-100 text-dark-500 hover:bg-dark-200 transition-colors"
-                              title={t("common.cancel")}
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-dark-300 text-xs">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {showForm && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div>
-                <h2 className="font-bold text-dark-900">{t("invoices.new")}</h2>
-                <p className="text-dark-400 text-xs mt-0.5">{t("invoices.createHint")}</p>
-              </div>
-              <button
-                onClick={() => setShowForm(false)}
-                className="w-8 h-8 rounded-xl bg-dark-100 flex items-center justify-center text-dark-400 hover:text-dark-700 hover:bg-dark-200 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal body */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("invoices.form.owner")} *</Label>
-                <FormSelect
-                  value={form.owner_id || null}
-                  onValueChange={(value) => setForm({ ...form, owner_id: Number(value) })}
-                  options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
-                  placeholder={t("invoices.form.selectOwner")}
-                  className="h-11 border-dark-200 bg-white"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("invoices.form.amount")} *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.amount || ""}
-                  onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-                  placeholder={t("invoices.form.amountPlaceholder")}
-                  required
-                  className="h-11 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("invoices.form.description")}</Label>
-                <Input
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder={t("invoices.form.descriptionPlaceholder")}
-                  className="h-11 rounded-xl"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-dark-100">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowForm(false)}
-                  className="rounded-xl h-11"
-                >
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  className="bg-brand-600 hover:bg-brand-700 rounded-xl h-11 font-semibold"
-                >
-                  {saving ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      {t("invoices.issuing")}
-                    </span>
-                  ) : t("invoices.issue")}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
-  );
+
+    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{t("invoices.trainingNotice")}</div>
+    {pendingTotal > 0 && <div className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"><div><p className="text-sm font-semibold text-amber-800">{t("invoices.pendingAlert.label")}</p><p className="text-xs text-amber-600">{t("invoices.pendingAlert.hint", { amount: pendingTotal.toLocaleString("pt-AO"), count: pendingInvoices.length })}</p></div><span className="text-lg font-extrabold tabular-nums text-amber-800">{pendingTotal.toLocaleString("pt-AO")} Kz</span></div>}
+    {error && <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
+
+    <Card><CardContent className="p-0">{loading ? <div className="flex justify-center py-16"><div className="size-6 animate-spin rounded-full border-2 border-brand-600/30 border-t-brand-600" /></div> : invoices.length === 0 ? <div className="flex flex-col items-center py-16 text-dark-400"><FileText className="mb-3 size-10 opacity-30" /><p className="text-sm font-medium">{t("invoices.noResults")}</p></div> : <Table>
+      <TableHeader><TableRow><TableHead className="pl-5">{t("invoices.table.number")}</TableHead><TableHead>{t("invoices.table.owner")}</TableHead><TableHead>{t("invoices.table.value")}</TableHead><TableHead>{t("invoices.table.status")}</TableHead><TableHead>{t("invoices.table.description")}</TableHead><TableHead className="pr-5 text-right">{t("invoices.table.actions")}</TableHead></TableRow></TableHeader>
+      <TableBody>{invoices.map((invoice) => <TableRow key={invoice.id}>
+        <TableCell className="pl-5 font-bold text-dark-700">{invoice.document_number ?? `#${invoice.id}`}</TableCell>
+        <TableCell className="font-medium">{invoice.customer_name ?? owners.find((item) => item.id === invoice.owner_id)?.name ?? "-"}</TableCell>
+        <TableCell className="font-bold tabular-nums"><span>{Number(invoice.quote_payable ?? invoice.amount).toLocaleString("pt-AO")} Kz</span>{invoice.quote_payable != null && <span className="block text-[10px] font-medium text-brand-600">{t("invoices.quote.providerTotal")}</span>}</TableCell>
+        <TableCell><Badge variant="secondary">{t(`invoices.status.${invoice.status}`)}</Badge></TableCell>
+        <TableCell className="max-w-52 truncate">{invoice.items?.[0]?.description ?? invoice.description ?? "-"}</TableCell>
+        <TableCell className="pr-5"><div className="flex justify-end gap-2">
+          {invoice.status === "draft" && !hasValidQuote(invoice) && <Button size="sm" variant="outline" onClick={() => handlePreview(invoice.id)}><Calculator className="mr-1 size-3.5" />{t("invoices.actions.preview")}</Button>}
+          {invoice.status === "draft" && hasValidQuote(invoice) && <Button size="sm" variant="outline" onClick={() => handleSync(invoice.id)}><Send className="mr-1 size-3.5" />{t("invoices.actions.send")}</Button>}
+          {invoice.status === "draft" && <Button size="icon-sm" variant="ghost" onClick={() => handleStatus(invoice.id, "cancelled")} aria-label={t("common.cancel")}><X className="size-4" /></Button>}
+          {invoice.document_url && <a href={invoice.document_url} target="_blank" rel="noreferrer" aria-label={t("invoices.actions.openDocument")} className="inline-flex size-7 items-center justify-center rounded-lg text-dark-500 hover:bg-dark-100"><ExternalLink className="size-4" /></a>}
+        </div></TableCell>
+      </TableRow>)}</TableBody>
+    </Table>}</CardContent></Card>
+
+    {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowForm(false)}><div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-dark-100 bg-white px-6 py-4"><div><h2 className="font-bold text-dark-900">{t("invoices.new")}</h2><p className="mt-0.5 text-xs text-dark-400">{t("invoices.createHint")}</p></div><Button type="button" size="icon-sm" variant="ghost" onClick={() => setShowForm(false)}><X className="size-4" /></Button></div>
+      <form onSubmit={handleSubmit} className="space-y-6 p-6">
+        <FormError message={formError} />
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="space-y-1.5"><Label>{t("invoices.form.owner")} *</Label><FormSelect value={form.owner_id || null} onValueChange={(value) => setForm((current) => ({ ...current, owner_id: Number(value), appointment_id: null }))} options={owners.map((item) => ({ value: item.id, label: item.nif ? `${item.name} · ${item.nif}` : item.name }))} placeholder={t("invoices.form.selectOwner")} required /></div>
+          <div className="space-y-1.5"><Label>{t("invoices.form.appointment")}</Label><FormSelect value={form.appointment_id} onValueChange={(value) => setForm((current) => ({ ...current, appointment_id: value ? Number(value) : null }))} options={[{ value: "", label: t("invoices.form.noAppointment") }, ...ownerAppointments.map((item) => ({ value: item.id, label: `${new Date(item.scheduled_at).toLocaleDateString("pt-AO")} · ${item.reason ?? t("appointments.title")}` }))]} /></div>
+          <div className="space-y-1.5"><Label>{t("invoices.form.documentType")}</Label><FormSelect value={form.document_type} onValueChange={(value) => setForm((current) => ({ ...current, document_type: value as "FT" | "FR" }))} options={[{ value: "FT", label: t("invoices.documentType.FT") }, { value: "FR", label: t("invoices.documentType.FR") }]} /></div>
+          {form.document_type === "FR" && <div className="space-y-1.5"><Label>{t("invoices.form.paymentMethod")}</Label><FormSelect value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as PaymentMethod }))} options={(["cash", "bank-transfer", "tpa"] as PaymentMethod[]).map((value) => ({ value, label: t(`invoices.paymentMethod.${value}`) }))} />{form.payment_method === "cash" && <p className="text-xs text-amber-700">{t("invoices.form.cashSessionHint")}</p>}</div>}
+        </div>
+        {owner && !owner.nif && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{t("invoices.form.missingNif")}</div>}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between"><div><h3 className="font-bold text-dark-900">{t("invoices.form.items")}</h3><p className="text-xs text-dark-400">{t("invoices.form.itemsHint")}</p></div><Button type="button" size="sm" variant="outline" onClick={() => setForm((current) => ({ ...current, items: [...current.items, emptyLine()] }))}><Plus className="mr-1 size-3.5" />{t("invoices.form.addItem")}</Button></div>
+          {form.items.map((item, index) => <div key={index} className="grid gap-3 rounded-xl border border-dark-100 bg-dark-50/50 p-4 md:grid-cols-2 lg:grid-cols-[110px_minmax(0,2fr)_80px_120px_140px_40px]">
+            <div className="space-y-1"><Label>{t("invoices.form.kind")}</Label><FormSelect value={item.kind} onValueChange={(value) => updateLine(index, { kind: value as "SERVICE" | "PRODUCT" })} options={[{ value: "SERVICE", label: t("invoices.lineKind.SERVICE") }, { value: "PRODUCT", label: t("invoices.lineKind.PRODUCT") }]} /></div>
+            <div className="space-y-1"><Label>{t("invoices.form.description")}</Label><Input value={item.description} onChange={(event) => updateLine(index, { description: event.target.value })} required /></div>
+            <div className="space-y-1"><Label>{t("invoices.form.quantity")}</Label><Input type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })} required /></div>
+            <div className="space-y-1"><Label>{t("invoices.form.unitPrice")}</Label><Input type="number" min="0" step="0.01" value={item.unit_price || ""} onChange={(event) => updateLine(index, { unit_price: Number(event.target.value) })} required /></div>
+            <div className="space-y-1"><Label>{t("invoices.form.vatProfile")}</Label><Input value={item.vat_profile_code ?? ""} onChange={(event) => updateLine(index, { vat_profile_code: event.target.value || undefined })} placeholder={t("invoices.form.vatProfileDefault")} /></div>
+            <Button type="button" size="icon-sm" variant="ghost" className="mt-6" disabled={form.items.length === 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))}><Trash2 className="size-4" /></Button>
+          </div>)}
+        </div>
+        <div className="ml-auto w-full max-w-sm space-y-2 rounded-xl bg-dark-50 p-4 text-sm tabular-nums"><div className="flex justify-between text-lg"><span>{t("invoices.summary.commercialSubtotal")}</span><strong>{subtotal.toLocaleString("pt-AO")} Kz</strong></div><p className="text-xs text-dark-500">{t("invoices.summary.providerTotalHint")}</p></div>
+        <div className="flex justify-end gap-3 border-t border-dark-100 pt-4"><Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button><Button type="submit" disabled={saving || !owner?.nif || subtotal < 0}>{saving ? t("invoices.savingDraft") : t("invoices.saveDraft")}</Button></div>
+      </form>
+    </div></div>}
+  </div>;
 }

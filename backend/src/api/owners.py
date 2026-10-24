@@ -12,7 +12,7 @@ from src.services.audit import audit
 
 router = APIRouter()
 
-OWNER_FIELDS = {"name", "phone", "email", "address", "notes"}
+OWNER_FIELDS = {"name", "phone", "email", "address", "nif", "notes"}
 
 
 @router.get("/", response_model=list[OwnerResponse])

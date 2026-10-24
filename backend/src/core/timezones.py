@@ -12,6 +12,12 @@ def utc_naive(value: datetime) -> datetime:
     return value.astimezone(UTC).replace(tzinfo=None)
 
 
+def stored_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
 def local_today() -> date:
     return datetime.now(ZoneInfo(settings.APP_TIMEZONE)).date()
 

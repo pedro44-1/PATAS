@@ -14,6 +14,7 @@ export interface UserResponse {
 
 export interface ClinicRegistration {
   clinic_name: string;
+  clinic_nif?: string;
   name: string;
   email: string;
   password: string;

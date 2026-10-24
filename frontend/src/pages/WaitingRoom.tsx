@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { apiErrorMessage } from "@/api/errors";
+import { FormError } from "@/components/ui/form-error";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { CalendarDays, Check, ChevronRight, Clock3, DoorOpen, MessageSquare, PawPrint, PhoneCall, Plus, Search, UserRound, X } from "lucide-react";
@@ -41,6 +43,7 @@ export default function WaitingRoom() {
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const [form, setForm] = useState({ pet_id: 0, vet_id: 0, service_type_id: 0, reason: "", room: "", message: "" });
 
   const canWrite = Boolean(user);
@@ -90,6 +93,7 @@ export default function WaitingRoom() {
       room: "",
       message: "",
     });
+    setFormError("");
     setShowWalkIn(true);
   }
 
@@ -105,6 +109,7 @@ export default function WaitingRoom() {
   async function createWalkIn(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
+    setFormError("");
     try {
       await waitingRoomApi.create({
         pet_id: form.pet_id,
@@ -116,8 +121,8 @@ export default function WaitingRoom() {
       });
       setShowWalkIn(false);
       load();
-    } catch {
-      window.alert(t("waitingRoom.errors.save"));
+    } catch (requestError: unknown) {
+      setFormError(apiErrorMessage(requestError, t, "waitingRoom.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -199,7 +204,7 @@ export default function WaitingRoom() {
         <CardContent className="p-0">{scheduledAppointments.length === 0 ? <p className="px-5 py-8 text-sm text-muted-foreground">{t("waitingRoom.scheduledEmpty")}</p> : <div className="divide-y divide-border/70">{scheduledAppointments.map((appointment) => <div key={appointment.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><p className="font-semibold text-foreground">{pets.find((pet) => pet.id === appointment.pet_id)?.name ?? t("waitingRoom.unknownPet")}</p><p className="text-xs text-muted-foreground">{appointment.reason || t("waitingRoom.defaultReason")} · {parseApiDate(appointment.scheduled_at).toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Luanda" })}</p></div><Button size="sm" variant="outline" onClick={() => addAppointment(appointment)}><Plus className="mr-1.5 size-3.5" />{t("waitingRoom.actions.checkIn")}</Button></div>)}</div>}</CardContent>
       </Card>
 
-      {showWalkIn && <div className="fixed inset-0 z-50 bg-black/50 p-4 backdrop-blur-sm" onClick={() => setShowWalkIn(false)}><div className="absolute left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-background shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between border-b border-border/70 px-6 py-4"><div><h3 className="font-bold text-foreground">{t("waitingRoom.walkInTitle")}</h3><p className="mt-1 text-xs text-muted-foreground">{t("waitingRoom.walkInHint")}</p></div><Button variant="ghost" size="icon-sm" onClick={() => setShowWalkIn(false)}><X className="size-4" /></Button></div><form onSubmit={createWalkIn} className="grid gap-4 p-6 sm:grid-cols-2"><Field label={t("waitingRoom.form.pet")}><FormSelect required value={form.pet_id || null} onValueChange={(value) => setForm({ ...form, pet_id: Number(value) })} options={pets.map((pet) => ({ value: pet.id, label: pet.name }))} placeholder={t("waitingRoom.form.selectPet")} /></Field><Field label={t("waitingRoom.form.vet")}><FormSelect required value={form.vet_id || null} onValueChange={(value) => setForm({ ...form, vet_id: Number(value) })} options={vets.map((vet) => ({ value: vet.id, label: vet.name }))} placeholder={t("waitingRoom.form.selectVet")} /></Field><Field label={t("waitingRoom.form.service")}><FormSelect required value={form.service_type_id || null} onValueChange={(value) => setForm({ ...form, service_type_id: Number(value) })} options={serviceTypes.filter((service) => service.active).map((service) => ({ value: service.id, label: service.name }))} placeholder={t("waitingRoom.form.selectService")} /></Field><Field label={t("waitingRoom.form.reason")}><Input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} placeholder={t("waitingRoom.form.reasonPlaceholder")} /></Field><Field label={t("waitingRoom.form.room")}><Input value={form.room} onChange={(event) => setForm({ ...form, room: event.target.value })} placeholder={t("waitingRoom.form.roomPlaceholder")} /></Field><Field label={t("waitingRoom.form.message")}><Input value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} placeholder={t("waitingRoom.form.messagePlaceholder")} /></Field><div className="flex justify-end gap-2 border-t border-border/70 pt-4 sm:col-span-2"><Button type="button" variant="ghost" onClick={() => setShowWalkIn(false)}>{t("common.cancel")}</Button><Button type="submit" disabled={saving}>{saving ? t("common.saving") : t("waitingRoom.create")}</Button></div></form></div></div>}
+      {showWalkIn && <div className="fixed inset-0 z-50 bg-black/50 p-4 backdrop-blur-sm" onClick={() => setShowWalkIn(false)}><div className="absolute left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-background shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between border-b border-border/70 px-6 py-4"><div><h3 className="font-bold text-foreground">{t("waitingRoom.walkInTitle")}</h3><p className="mt-1 text-xs text-muted-foreground">{t("waitingRoom.walkInHint")}</p></div><Button variant="ghost" size="icon-sm" onClick={() => setShowWalkIn(false)}><X className="size-4" /></Button></div><form onSubmit={createWalkIn} className="grid gap-4 p-6 sm:grid-cols-2">{formError && <div className="sm:col-span-2"><FormError message={formError} /></div>}<Field label={t("waitingRoom.form.pet")}><FormSelect required value={form.pet_id || null} onValueChange={(value) => setForm({ ...form, pet_id: Number(value) })} options={pets.map((pet) => ({ value: pet.id, label: pet.name }))} placeholder={t("waitingRoom.form.selectPet")} /></Field><Field label={t("waitingRoom.form.vet")}><FormSelect required value={form.vet_id || null} onValueChange={(value) => setForm({ ...form, vet_id: Number(value) })} options={vets.map((vet) => ({ value: vet.id, label: vet.name }))} placeholder={t("waitingRoom.form.selectVet")} /></Field><Field label={t("waitingRoom.form.service")}><FormSelect required value={form.service_type_id || null} onValueChange={(value) => setForm({ ...form, service_type_id: Number(value) })} options={serviceTypes.filter((service) => service.active).map((service) => ({ value: service.id, label: service.name }))} placeholder={t("waitingRoom.form.selectService")} /></Field><Field label={t("waitingRoom.form.reason")}><Input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} placeholder={t("waitingRoom.form.reasonPlaceholder")} /></Field><Field label={t("waitingRoom.form.room")}><Input value={form.room} onChange={(event) => setForm({ ...form, room: event.target.value })} placeholder={t("waitingRoom.form.roomPlaceholder")} /></Field><Field label={t("waitingRoom.form.message")}><Input value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} placeholder={t("waitingRoom.form.messagePlaceholder")} /></Field><div className="flex justify-end gap-2 border-t border-border/70 pt-4 sm:col-span-2"><Button type="button" variant="ghost" onClick={() => setShowWalkIn(false)}>{t("common.cancel")}</Button><Button type="submit" disabled={saving}>{saving ? t("common.saving") : t("waitingRoom.create")}</Button></div></form></div></div>}
     </div>
   );
 }

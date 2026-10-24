@@ -72,7 +72,7 @@ def register(data: ClinicRegistration, db: Session = Depends(get_db), request: R
     if existing:
         raise HTTPException(status_code=400, detail="Email já registado")
 
-    clinic = Clinic(name=data.clinic_name.strip())
+    clinic = Clinic(name=data.clinic_name.strip(), nif=data.clinic_nif)
     db.add(clinic)
     db.flush()
 

@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-O PATAS apoia a operação diária de uma clínica veterinária: a receção regista donos e animais, agenda consultas e acompanha o estado da agenda; o veterinário realiza o atendimento e regista o histórico clínico. A faturação desta versão é apenas um registo local com adaptador mock para integração futura.
+O PATAS apoia a operação diária de uma clínica veterinária: a receção regista donos e animais, agenda consultas e acompanha o estado da agenda; o veterinário realiza o atendimento e regista o histórico clínico. Na faturação, o PATAS prepara e preserva os dados obrigatórios e delega a emissão fiscal a um software terceiro através de um adaptador substituível, com mock no piloto.
 
 ## Atores e permissões
 
@@ -76,16 +76,25 @@ Todos os dados são isolados pela clínica do utilizador autenticado.
 3. Deve mostrar as próximas consultas ativas.
 4. Os contadores da navegação não podem ser valores fixos no frontend.
 
-### RF-08 — Faturação mock
+### RF-08 — Preparação e integração de faturação
 
-1. Um utilizador autorizado pode criar um registo de cobrança associado ao dono e opcionalmente à consulta.
+1. Um utilizador autorizado pode preparar um pedido de faturação associado ao dono e opcionalmente à consulta.
 2. A consulta associada deve pertencer ao mesmo dono e clínica.
 3. O registo usa moeda AOA e estados `draft`, `sent`, `paid` e `cancelled`.
 4. O cancelamento exige motivo.
-5. O adaptador mock deve criar uma referência externa local e marcar a sincronização como `synced`.
-6. O endpoint de estado deve permitir substituir futuramente o adaptador sem alterar o fluxo clínico.
-7. Não são processados pagamentos reais nesta versão.
-8. Rececionistas, veterinários e administradores podem criar e consultar faturas; não existe eliminação física e `paid`/`cancelled` são terminais.
+5. O pedido guarda NIF e nome do emitente e cliente, linhas de produto/serviço, quantidades, preços líquidos e chave idempotente. Na API do Vendas, a credencial seleciona a empresa emitente; o PATAS envia o NIF e nome do cliente e o identificador da loja, e o NIF da clínica deve corresponder à empresa configurada no Vendas.
+6. O PATAS calcula apenas o subtotal comercial provisório; o Vendas determina IVA, retenções e total fiscal, e os dados enviados ficam preservados como instantâneo histórico.
+7. O adaptador mock deve devolver referência, série e número simulados e marcar a sincronização como `synced`.
+8. O endpoint de estado deve permitir substituir o adaptador sem alterar o fluxo clínico.
+9. A série, número fiscal e documento final pertencem ao software terceiro; o PATAS guarda os valores devolvidos.
+10. Não são processados pagamentos reais nesta versão.
+11. Rececionistas, veterinários e administradores podem criar e consultar faturas; não existe eliminação física e `paid`/`cancelled` são terminais.
+12. O Vendas é chamado server-to-server com `externalId` estável, `storeExternalId` por clínica e `Idempotency-Key` UUID persistida.
+13. FT e FR exigem uma prévia fiscal válida do Vendas. FT omite pagamento; FR envia `tenders` cuja soma é exatamente o `payable` cotado.
+14. Falhas externas preservam o rascunho, registam tentativa/erro seguro e permitem retry com a mesma chave.
+15. O modo `TRAINING` deve estar explícito na interface e não pode ser apresentado como fiscalmente válido.
+16. Um documento já aceite pelo Vendas não pode ser anulado apenas no PATAS; é necessário um contrato externo de anulação ou nota de crédito.
+17. A prévia e a emissão usam chaves UUID distintas. Cotação ausente, expirada, alterada ou incompatível obriga a obter nova prévia sem marcar o pedido como emitido ou pago.
 
 ### RF-09 — Gestão de utilizadores
 
@@ -126,7 +135,9 @@ Agenda, dashboard e sala de espera usam `Africa/Luanda`. Instantes são armazena
 - `GET /api/v1/pets/{id}/history` — histórico clínico agregado.
 - `GET/POST/PATCH /api/v1/vaccinations/` e `POST /api/v1/vaccinations/{id}/void` — vacinas estruturadas.
 - `GET/POST/PATCH /api/v1/medications/` e `POST /api/v1/medications/{id}/void` — medicamentos estruturados.
-- `POST /api/v1/invoices/{id}/sync` — sincronização com o adaptador mock.
+- `GET/PATCH /api/v1/clinics/me` — leitura e configuração administrativa dos dados da clínica usados na faturação.
+- `POST /api/v1/invoices/{id}/preview` — obtém e preserva a prévia fiscal do Vendas.
+- `POST /api/v1/invoices/{id}/sync` — emite a FT/FR com a cotação e chave de emissão persistidas.
 - `GET /api/v1/invoices/{id}/sync-status` — estado local e externo da sincronização.
 - `GET/POST/PATCH /api/v1/service-types/` — tipos de serviço da clínica.
 - `GET /api/v1/waiting-room/` e `POST/PATCH /api/v1/waiting-room/entries` — sala de espera e entradas.

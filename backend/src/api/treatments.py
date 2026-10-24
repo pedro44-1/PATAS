@@ -56,6 +56,8 @@ def create_treatment(
     ).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Consulta não encontrada")
+    if db.query(Treatment.id).filter(Treatment.appointment_id == appointment.id).first():
+        raise HTTPException(status_code=409, detail="Esta consulta já tem um tratamento registado")
     _validate_referring_vet(db, current_user.clinic_id, data.referring_vet_id)
 
     treatment = Treatment(clinic_id=current_user.clinic_id, **data.model_dump())

@@ -8,7 +8,7 @@ from src.models.clinical_exam import (
     ClinicalExamSystem,
     ExamFindingStatus,
 )
-from src.models.invoice import Invoice
+from src.models.invoice import Invoice, InvoiceLine
 from src.models.medication import Medication
 from src.models.owner import Owner
 from src.models.permission import Permission

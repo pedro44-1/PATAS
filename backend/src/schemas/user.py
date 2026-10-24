@@ -15,6 +15,7 @@ class ClinicRegistration(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     clinic_name: str = Field(..., min_length=1, max_length=255)
+    clinic_nif: str | None = Field(None, max_length=30)
     name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)

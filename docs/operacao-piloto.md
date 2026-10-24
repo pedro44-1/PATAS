@@ -27,7 +27,7 @@ Aceda por `http://<ip-do-servidor>/`. O primeiro registo cria uma clínica e o a
 3. Atualize o código/imagens.
 4. Execute `docker compose -f infra/docker-compose.yml --env-file infra/.env up -d --build`.
 5. Confirme `docker compose ... ps`, os logs de `migrate` e `curl --fail http://127.0.0.1/health`.
-6. Faça login e valide agenda, sala de espera, histórico e faturação mock.
+6. Faça login e valide agenda, sala de espera, histórico e faturação no modo configurado.
 
 Se `migrate` falhar, o backend não arranca. Preserve a base, recolha `docker compose -f infra/docker-compose.yml --env-file infra/.env logs migrate` e corrija a causa antes de repetir; não contorne a migração.
 
@@ -58,3 +58,16 @@ Depois do restauro, confirme que um administrador inicia sessão, que donos/anim
 - O relógio funcional é `Africa/Luanda`; a persistência usa UTC.
 - Donos e animais são arquivados, não apagados. Tratamentos não têm eliminação física. Faturas terminam em `paid` ou `cancelled`; cancelamento exige motivo.
 - O piloto não inclui HTTPS público, pagamentos reais, email de convite/recuperação, alta disponibilidade ou monitorização avançada.
+
+## Integração Vendas em TRAINING
+
+1. No Vendas, crie uma chave server-to-server com `invoice.issue`, `invoice.read`, `customer.upsert` e `product.upsert`; para FR em numerário, acrescente `cash.operate`.
+2. Configure no `infra/.env`: `BILLING_PROVIDER=vendas`, `VENDAS_BASE_URL`, `VENDAS_API_KEY`, `VENDAS_OPERATION_TYPE`, `VENDAS_DEFAULT_VAT_PROFILE_CODE` e, para numerário, `VENDAS_CASH_SESSION_ID`. O URL tem de ser alcançável a partir do container backend; se os programas usarem Compose separados, configure uma rede partilhada ou um endereço de rede acessível aos dois.
+3. No PATAS, em Configurações, preencha o NIF da clínica e o `storeExternalId` atribuído pelo Vendas.
+4. Reinicie apenas o backend e confirme `/health`.
+5. Calcule uma prévia, confirme o total Vendas e emita primeiro uma FT de ensaio; confirme `provider_mode=TRAINING`, referência, série e número, e repita o envio para verificar idempotência. Se associada a uma consulta, confirme que `externalReference` no Vendas é `appointment-<id>`.
+6. Teste uma FR sem numerário e confirme que o tender coincide com o `payable` cotado e que só fica paga após resposta de emissão.
+
+Nunca coloque `VENDAS_API_KEY` no frontend, documentação, logs ou base de dados. Uma falha externa mantém o pedido em rascunho, regista apenas uma mensagem segura e permite repetir com a mesma chave idempotente. O modo TRAINING não tem validade fiscal nem comunicação AGT.
+
+O subtotal mostrado pelo PATAS é provisório. O Vendas é a autoridade para IVA, retenções e total fiscal. Uma cotação expirada ou alterada deve ser recalculada antes de cobrar ou emitir; o PATAS nunca confirma pagamento apenas com base no subtotal local.

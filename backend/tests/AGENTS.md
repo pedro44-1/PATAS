@@ -10,6 +10,8 @@ Tests verify contracts owned by `backend/src`; fixtures may configure databases 
 
 ## Local Contracts
 
+- Role fixtures are real roles: `vet_*` is a veterinarian, `admin_*` an administrator, `receptionist_*` a receptionist; never rely on the admin bypass in non-admin tests.
+- `test_schema_drift.py` upgrades a temporary SQLite database to the Alembic head and compares it with the ORM metadata; model and migration changes must keep it green.
 - Unit tests are the default suite; integration tests use the existing `integration` marker and environment setup.
 - Cover successful behavior, invalid transitions, permission failures, and cross-clinic isolation for changed endpoints.
 - Keep tests deterministic and independent; do not depend on a developer’s local database or credentials.

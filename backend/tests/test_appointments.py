@@ -50,10 +50,27 @@ def test_create_appointment_rejects_overlap(client, vet_headers, appointment, pe
     response = client.post("/api/v1/appointments/", headers=vet_headers, json={
         "pet_id": pet.id,
         "vet_id": vet_user.id,
-        "scheduled_at": appointment.scheduled_at.isoformat(),
+        "scheduled_at": appointment.scheduled_at.isoformat() + "+00:00",
         "duration_min": 15,
     })
     assert response.status_code == 409
+
+
+def test_overlap_check_uses_stored_utc_and_luanda_input(client, vet_headers, pet, vet_user):
+    def book(scheduled_at: str):
+        return client.post("/api/v1/appointments/", headers=vet_headers, json={
+            "pet_id": pet.id,
+            "vet_id": vet_user.id,
+            "scheduled_at": scheduled_at,
+            "duration_min": 30,
+        })
+
+    assert book("2031-03-10T09:00:00").status_code == 200
+    assert book("2031-03-10T09:00:00").status_code == 409
+    assert book("2031-03-10T09:15:00").status_code == 409
+    assert book("2031-03-10T08:15:00+00:00").status_code == 409
+    assert book("2031-03-10T08:00:00").status_code == 200
+    assert book("2031-03-10T09:30:00+01:00").status_code == 200
 
 
 def test_get_appointment(client, vet_headers, appointment):
@@ -119,6 +136,30 @@ def test_list_appointments_filter_wrong_date(client, vet_headers, appointment):
     response = client.get("/api/v1/appointments/?date=2099-01-01", headers=vet_headers)
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_list_appointments_filter_by_date_range(client, vet_headers, appointment):
+    date_str = appointment.scheduled_at.strftime("%Y-%m-%d")
+    response = client.get(
+        f"/api/v1/appointments/?date_from={date_str}&date_to={date_str}",
+        headers=vet_headers,
+    )
+    assert response.status_code == 200
+    assert appointment.id in {item["id"] for item in response.json()}
+
+
+def test_list_appointments_rejects_invalid_date_range(client, vet_headers):
+    response = client.get(
+        "/api/v1/appointments/?date_from=2026-10-02&date_to=2026-10-01",
+        headers=vet_headers,
+    )
+    assert response.status_code == 422
+
+    incomplete = client.get(
+        "/api/v1/appointments/?date_from=2026-10-01",
+        headers=vet_headers,
+    )
+    assert incomplete.status_code == 422
 
 
 def test_receptionist_can_manage_appointments(client, receptionist_headers, pet, vet_user):

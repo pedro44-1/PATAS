@@ -78,7 +78,7 @@ export function FormSelect({
             className={cn(
               "px-3 py-2",
               option.variant === "action" &&
-                "mt-1 border-t border-border pt-2.5 font-semibold text-brand-700 focus:text-brand-700",
+                "mb-1 border-b border-border pb-2.5 font-semibold text-brand-700 focus:text-brand-700",
             )}
           >
             {option.label}

@@ -12,6 +12,8 @@ Models define persistence shape and relationship invariants. Alembic owns the du
 
 - Tenant-owned records carry and enforce `clinic_id` as required by the current design.
 - Preserve the current relationships: treatments link through `appointment_id`; invoices use `owner_id` and optional `appointment_id`.
+- Invoice lines and issuer/customer snapshots preserve exactly what was prepared for the external billing provider; provider series, number, URL, and reference remain nullable until accepted. The series field accommodates a Vendas `seriesId` UUID.
+- Billing quotes preserve payable, fiscal configuration version, digest, expiry, and raw provider snapshot; preview and emission idempotency keys are distinct.
 - Keep service types, waiting-room entries, exam catalogues, and clinical observations tenant-scoped through `clinic_id`.
 - Use archive flags for service and exam configuration so historical appointments and observations remain readable.
 - Owners and pets use `archived_at` and `archived_by_user_id`; archive never cascades to physical deletion.

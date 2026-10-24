@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
@@ -14,9 +14,9 @@ class Pet(Base):
     owner_id = Column(Integer, ForeignKey("owners.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     species = Column(String(100), nullable=False)
-    breed = Column(String(255), nullable=True)
+    breed = Column(String(100), nullable=True)
     birth_date = Column(Date, nullable=True)
-    weight = Column(Float, nullable=True)  # kg — latest recorded weight
+    weight = Column(Numeric(8, 2), nullable=True)  # kg — latest recorded weight
     notes = Column(Text, nullable=True)
     archived_at = Column(DateTime, nullable=True, index=True)
     archived_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

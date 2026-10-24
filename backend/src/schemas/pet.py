@@ -1,25 +1,27 @@
-﻿from datetime import date, datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
+
+from src.schemas.common import OptionalText
 
 
 class PetCreate(BaseModel):
     owner_id: int
     name: str = Field(..., min_length=1, max_length=100)
     species: str = Field(..., min_length=1, max_length=50)
-    breed: str | None = Field(None, max_length=100)
+    breed: OptionalText = Field(None, max_length=100)
     birth_date: date | None = None
     weight: float | None = Field(None, ge=0)
-    notes: str | None = Field(None, max_length=1000)
+    notes: OptionalText = Field(None, max_length=1000)
 
 
 class PetUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     species: str | None = Field(None, min_length=1, max_length=50)
-    breed: str | None = Field(None, max_length=100)
+    breed: OptionalText = Field(None, max_length=100)
     birth_date: date | None = None
     weight: float | None = Field(None, ge=0)
-    notes: str | None = Field(None, max_length=1000)
+    notes: OptionalText = Field(None, max_length=1000)
 
 
 class PetResponse(BaseModel):

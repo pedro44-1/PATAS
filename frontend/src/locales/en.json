@@ -39,6 +39,7 @@
     "registerHint": "Register the clinic and its first administrator account.",
     "registerError": "The clinic could not be created.",
     "clinicName": "Clinic name",
+    "clinicNif": "Clinic tax ID",
     "adminName": "Administrator name",
     "passwordRules": "At least 8 characters, with one uppercase letter and one number.",
     "createClinic": "Create clinic",
@@ -102,6 +103,11 @@
     "noResults": "No appointments for this day",
     "create": "Schedule appointment",
     "saving": "Scheduling...",
+    "dateRange": {
+      "from": "Start date",
+      "to": "End date",
+      "label": "{{start}} to {{end}}"
+    },
     "form": {
       "animal": "Animal",
       "selectAnimal": "Select animal",
@@ -123,6 +129,12 @@
       "title": "Quick animal registration",
       "hint": "Create the animal without losing the appointment details.",
       "noOwners": "A registered owner is required to create the animal.",
+      "createOwner": "Register new owner",
+      "create": "Register and select"
+    },
+    "quickOwner": {
+      "title": "Quick owner registration",
+      "hint": "Create the owner without losing the animal or appointment details.",
       "create": "Register and select"
     },
     "table": {
@@ -173,6 +185,8 @@
       "emailPlaceholder": "email@example.com",
       "address": "Address",
       "addressPlaceholder": "Street, number, neighbourhood",
+      "nif": "Tax ID",
+      "nifPlaceholder": "Owner tax ID",
       "notes": "Notes",
       "notesPlaceholder": "Additional notes"
     },
@@ -261,8 +275,12 @@
         "noData": "No appointments recorded",
         "encounter": "Encounter"
       },
-      "treatments": { "noData": "No treatments recorded" },
-      "invoices": { "noData": "No invoices recorded" }
+      "treatments": {
+        "noData": "No treatments recorded"
+      },
+      "invoices": {
+        "noData": "No invoices recorded"
+      }
     },
     "species": {
       "Cão": "Dog",
@@ -316,7 +334,8 @@
       "diagnosis": "Diagnosis",
       "prescription": "Prescription",
       "actions": "Actions"
-    }
+    },
+    "error": "Could not save the treatment."
   },
   "settings": {
     "title": "Settings",
@@ -327,6 +346,12 @@
     "currencyValue": "AOA — Angolan kwanza",
     "timezone": "Time zone",
     "timezoneValue": "Africa/Luanda",
+    "billingNif": "Clinic tax ID for billing",
+    "billingNifPlaceholder": "Issuer tax ID",
+    "billingNifHint": "Required to prepare an invoice. The issuer must match the company configured in Vendas.",
+    "billingStoreId": "Vendas store identifier",
+    "billingStoreIdPlaceholder": "storeExternalId assigned by Vendas",
+    "billingStoreIdHint": "Links PATAS requests to the correct Vendas store.",
     "catalog": {
       "servicesTitle": "Service types",
       "servicesHint": "Categories used in the agenda and waiting room.",
@@ -365,8 +390,12 @@
     "createHint": "Issue a new invoice",
     "issue": "Issue invoice",
     "issuing": "Issuing...",
+    "saveDraft": "Save draft",
+    "savingDraft": "Saving...",
     "cancelReason": "Enter the cancellation reason:",
     "error": "The invoice could not be updated.",
+    "previewError": "The fiscal preview could not be calculated by Vendas.",
+    "trainingNotice": "Billing integration is in trial mode. Vendas TRAINING does not produce fiscally valid documents.",
     "pendingAlert": {
       "label": "Pending collection total",
       "hint_one": "{{amount}} Kz across {{count}} unpaid invoice",
@@ -382,10 +411,46 @@
     "form": {
       "owner": "Owner",
       "selectOwner": "Select owner",
-      "amount": "Amount (Kz)",
-      "amountPlaceholder": "2500",
+      "appointment": "Appointment",
+      "noAppointment": "No related appointment",
+      "paymentMethod": "Payment method",
+      "cashSessionHint": "Cash requires an open cash session in Vendas.",
+      "documentType": "Document type",
+      "missingNif": "Add this owner's tax ID before preparing the invoice.",
+      "items": "Products and services",
+      "itemsHint": "These details will be sent to the billing provider.",
+      "addItem": "Add line",
+      "kind": "Type",
       "description": "Description",
-      "descriptionPlaceholder": "Invoice description"
+      "quantity": "Quantity",
+      "unitPrice": "Unit price",
+      "vatProfile": "VAT profile",
+      "vatProfileDefault": "Default",
+      "taxRate": "Tax (%)"
+    },
+    "documentType": {
+      "FT": "Invoice (FT) — payment later",
+      "FR": "Invoice-receipt (FR) — immediate payment"
+    },
+    "lineKind": {
+      "SERVICE": "Service",
+      "PRODUCT": "Product"
+    },
+    "paymentMethod": {
+      "cash": "Cash",
+      "bank-transfer": "Bank transfer",
+      "tpa": "Card terminal",
+      "other": "Other"
+    },
+    "summary": {
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "total": "Total",
+      "commercialSubtotal": "Commercial subtotal",
+      "providerTotalHint": "VAT and the final fiscal total are calculated by Vendas when the document is issued."
+    },
+    "quote": {
+      "providerTotal": "Total calculated by Vendas"
     },
     "table": {
       "number": "No.",
@@ -403,10 +468,12 @@
       "cancelled": "Cancelled"
     },
     "actions": {
-      "send": "Send",
+      "preview": "Calculate in Vendas",
+      "send": "Issue in Vendas",
       "sendHint": "Send to the payment system",
       "markPaid": "Paid",
-      "markPaidHint": "Mark as paid"
+      "markPaidHint": "Mark as paid",
+      "openDocument": "Open issued document"
     }
   },
   "clinical": {

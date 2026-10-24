@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { apiErrorMessage } from "@/api/errors";
+import { FormError } from "@/components/ui/form-error";
 import { useTranslation } from "react-i18next";
 import { treatmentsApi, Treatment, TreatmentCreate } from "@/api/treatments";
 import { appointmentsApi, Appointment, AppointmentCreate, VetOption } from "@/api/appointments";
@@ -90,6 +92,8 @@ export default function Treatments() {
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const [dictationTarget, setDictationTarget] = useState<DictationField | null>(null);
   const [dictationError, setDictationError] = useState<string | null>(null);
+  const [formError, setFormError] = useState("");
+  const [appointmentFormError, setAppointmentFormError] = useState("");
 
   function load() {
     Promise.all([treatmentsApi.list(), appointmentsApi.list()])
@@ -144,6 +148,7 @@ export default function Treatments() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
+    setFormError("");
     try {
       if (editing) {
         await treatmentsApi.update(editing.id, form);
@@ -152,7 +157,8 @@ export default function Treatments() {
       }
       closeTreatmentForm();
       load();
-    } catch {
+    } catch (requestError: unknown) {
+      setFormError(apiErrorMessage(requestError, t, "treatments.error"));
     } finally {
       setSaving(false);
     }
@@ -180,13 +186,15 @@ export default function Treatments() {
   async function handleAppointmentSubmit(event: React.FormEvent) {
     event.preventDefault();
     setAppointmentSaving(true);
+    setAppointmentFormError("");
     try {
       const response = await appointmentsApi.create(appointmentForm);
       const createdAppointment = response.data;
       setAppointments((current) => [createdAppointment, ...current.filter((item) => item.id !== createdAppointment.id)]);
       setForm((current) => ({ ...current, appointment_id: createdAppointment.id }));
       setShowAppointmentForm(false);
-    } catch {
+    } catch (requestError: unknown) {
+      setAppointmentFormError(apiErrorMessage(requestError, t, "appointments.error"));
     } finally {
       setAppointmentSaving(false);
     }
@@ -367,6 +375,7 @@ export default function Treatments() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
+              <FormError message={formError} />
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <Label className="text-xs font-semibold text-dark-600">{t("treatments.form.appointment")} *</Label>
@@ -454,6 +463,7 @@ export default function Treatments() {
             </div>
 
             <form onSubmit={handleAppointmentSubmit} className="space-y-4 p-6">
+              <FormError message={appointmentFormError} />
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.animal")} *</Label>
                 <FormSelect

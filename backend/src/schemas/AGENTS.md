@@ -17,6 +17,8 @@ Schemas define the serialized API contract and input validation. They must refle
 - Registration does not accept a role; admin-created users accept a temporary password and responses expose `must_change_password` without ever returning a password.
 - Owner and pet responses expose archive state; list inclusion is controlled by `include_archived`.
 - Waiting-room, service-type, exam-catalogue, and aggregated clinical-record schemas are public contracts and must stay aligned with their frontend clients and API documentation.
+- Optional free-text and email inputs use `OptionalText`/`OptionalEmail` from `common.py`, so blank strings are stored as `null`.
+- Itemized invoice requests expose quantities and net unit prices; local tax rates remain zero. Provider quote/payable and document metadata are server-owned response fields.
 
 ## Work Guidance
 

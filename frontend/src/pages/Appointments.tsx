@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { FormError } from "@/components/ui/form-error";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { appointmentsApi, Appointment, AppointmentCreate, VetOption } from "@/api/appointments";
 import { petsApi, Pet, PetCreate } from "@/api/pets";
-import { ownersApi, Owner } from "@/api/owners";
+import { ownersApi, Owner, OwnerCreate } from "@/api/owners";
 import { serviceTypesApi } from "@/api/serviceTypes";
 import type { ServiceType } from "@patas/shared-types";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiErrorMessage } from "@/api/errors";
 
 const CREATE_PET_VALUE = "__create_pet__";
+const CREATE_OWNER_VALUE = "__create_owner__";
 const PET_SPECIES = ["Cão", "Gato", "Ave", "Roedor", "Coelho", "Réptil", "Outro"] as const;
 
 function statusConfig(status: string) {
@@ -52,9 +54,8 @@ export default function Appointments() {
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [filterDate, setFilterDate] = useState(
-    clinicDateInput()
-  );
+  const [filterStartDate, setFilterStartDate] = useState(clinicDateInput());
+  const [filterEndDate, setFilterEndDate] = useState(clinicDateInput());
   const [form, setForm] = useState<AppointmentCreate>({
     pet_id: 0,
     vet_id: 0,
@@ -67,13 +68,19 @@ export default function Appointments() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
   const [showQuickPet, setShowQuickPet] = useState(false);
   const [savingPet, setSavingPet] = useState(false);
   const [petError, setPetError] = useState("");
   const [petForm, setPetForm] = useState<PetCreate>({ owner_id: 0, name: "", species: "Cão" });
+  const [showQuickOwner, setShowQuickOwner] = useState(false);
+  const [savingOwner, setSavingOwner] = useState(false);
+  const [ownerError, setOwnerError] = useState("");
+  const [ownerForm, setOwnerForm] = useState<OwnerCreate>({ name: "", phone: "", email: "" });
 
   function load() {
-    Promise.all([appointmentsApi.list(filterDate), petsApi.list(), ownersApi.list(), appointmentsApi.vets(), serviceTypesApi.list()])
+    setLoading(true);
+    Promise.all([appointmentsApi.list({ dateFrom: filterStartDate, dateTo: filterEndDate }), petsApi.list(), ownersApi.list(), appointmentsApi.vets(), serviceTypesApi.list()])
       .then(([apptsRes, petsRes, ownersRes, vetsRes, serviceTypesRes]) => {
         setAppointments(apptsRes.data);
         setPets(petsRes.data);
@@ -84,10 +91,10 @@ export default function Appointments() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, [filterDate]);
+  useEffect(() => { load(); }, [filterStartDate, filterEndDate]);
 
   function openCreate() {
-    const defaultTime = `${filterDate}T09:00`;
+    const defaultTime = `${filterStartDate}T09:00`;
     setForm({
       pet_id: pets[0]?.id ?? 0,
       vet_id: vets[0]?.id ?? 0,
@@ -115,6 +122,41 @@ export default function Appointments() {
     setForm({ ...form, pet_id: Number(value) });
   }
 
+  function openQuickOwner() {
+    setOwnerError("");
+    setOwnerForm({ name: "", phone: "", email: "" });
+    setShowQuickOwner(true);
+  }
+
+  function handleOwnerSelection(value: string) {
+    if (value === CREATE_OWNER_VALUE) {
+      openQuickOwner();
+      return;
+    }
+    setPetForm({ ...petForm, owner_id: Number(value) });
+  }
+
+  async function handleQuickOwnerSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingOwner(true);
+    setOwnerError("");
+    try {
+      const response = await ownersApi.create({
+        ...ownerForm,
+        phone: ownerForm.phone || undefined,
+        email: ownerForm.email || undefined,
+      });
+      const createdOwner = response.data;
+      setOwners((current) => [...current, createdOwner]);
+      setPetForm((current) => ({ ...current, owner_id: createdOwner.id }));
+      setShowQuickOwner(false);
+    } catch (requestError: unknown) {
+      setOwnerError(apiErrorMessage(requestError, t, "owners.error"));
+    } finally {
+      setSavingOwner(false);
+    }
+  }
+
   async function handleQuickPetSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSavingPet(true);
@@ -135,13 +177,13 @@ export default function Appointments() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError("");
+    setFormError("");
     try {
       await appointmentsApi.create(form);
       setShowForm(false);
       load();
     } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "appointments.error"));
+      setFormError(apiErrorMessage(requestError, t, "appointments.error"));
     } finally {
       setSaving(false);
     }
@@ -166,31 +208,59 @@ export default function Appointments() {
     return pets.find((p) => p.id === id)?.name ?? "—";
   }
 
-  const todayLabel = new Date(filterDate + "T12:00:00Z").toLocaleDateString(
+  const startLabel = new Date(filterStartDate + "T12:00:00Z").toLocaleDateString(
     "pt-AO",
-    { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Luanda" }
+    filterStartDate === filterEndDate
+      ? { weekday: "long", day: "numeric", month: "long", timeZone: "Africa/Luanda" }
+      : { day: "2-digit", month: "short", year: "numeric", timeZone: "Africa/Luanda" },
   );
+  const endLabel = new Date(filterEndDate + "T12:00:00Z").toLocaleDateString(
+    "pt-AO",
+    { day: "2-digit", month: "short", year: "numeric", timeZone: "Africa/Luanda" },
+  );
+  const filterLabel = filterStartDate === filterEndDate
+    ? startLabel
+    : t("appointments.dateRange.label", { start: startLabel, end: endLabel });
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-dark-900">{t("appointments.title")}</h2>
-          <p className="text-dark-400 text-sm mt-0.5 capitalize">{todayLabel}</p>
+          <p className="text-dark-400 text-sm mt-0.5 capitalize">{filterLabel}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400 pointer-events-none" />
+        <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto">
+          <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
+            <Label htmlFor="appointments-date-from" className="text-xs font-semibold text-dark-500">
+              {t("appointments.dateRange.from")}
+            </Label>
             <input
+              id="appointments-date-from"
               type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="pl-9 h-10 rounded-xl border border-dark-200 bg-white px-3 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              value={filterStartDate}
+              max={filterEndDate}
+              onChange={(event) => event.target.value && setFilterStartDate(event.target.value)}
+              required
+              className="h-10 w-full rounded-xl border border-dark-200 bg-white px-3 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
+            <Label htmlFor="appointments-date-to" className="text-xs font-semibold text-dark-500">
+              {t("appointments.dateRange.to")}
+            </Label>
+            <input
+              id="appointments-date-to"
+              type="date"
+              value={filterEndDate}
+              min={filterStartDate}
+              onChange={(event) => event.target.value && setFilterEndDate(event.target.value)}
+              required
+              className="h-10 w-full rounded-xl border border-dark-200 bg-white px-3 text-sm text-dark-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
           <Button
             onClick={openCreate}
-            className="bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
+            className="h-10 bg-brand-600 hover:bg-brand-700 font-semibold rounded-xl shadow-lg shadow-brand-600/20"
           >
             <Plus className="w-4 h-4 mr-2" />
             {t("appointments.new")}
@@ -334,13 +404,13 @@ export default function Appointments() {
             {/* Modal body */}
             <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+              <FormError message={formError} />
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.animal")} *</Label>
                 <FormSelect
                   value={form.pet_id || null}
                   onValueChange={handlePetSelection}
                   options={[
-                    ...pets.map((pet) => ({ value: pet.id, label: pet.name })),
                     {
                       value: CREATE_PET_VALUE,
                       label: (
@@ -351,6 +421,7 @@ export default function Appointments() {
                       ),
                       variant: "action" as const,
                     },
+                    ...pets.map((pet) => ({ value: pet.id, label: pet.name })),
                   ]}
                   placeholder={t("appointments.form.selectAnimal")}
                   className="h-11 border-dark-200 bg-white"
@@ -505,10 +576,23 @@ export default function Appointments() {
                   <Label className="text-xs font-semibold text-dark-600">{t("pets.form.owner")} *</Label>
                   <FormSelect
                     value={petForm.owner_id || null}
-                    onValueChange={(value) => setPetForm({ ...petForm, owner_id: Number(value) })}
-                    options={owners.map((owner) => ({ value: owner.id, label: owner.name }))}
+                    onValueChange={handleOwnerSelection}
+                    options={[
+                      {
+                        value: CREATE_OWNER_VALUE,
+                        label: (
+                          <span className="flex items-center gap-2">
+                            <Plus className="size-4" />
+                            {t("appointments.quickPet.createOwner")}
+                          </span>
+                        ),
+                        variant: "action" as const,
+                      },
+                      ...owners.map((owner) => ({ value: owner.id, label: owner.name })),
+                    ]}
                     placeholder={t("pets.form.selectOwner")}
                     className="h-11 border-dark-200 bg-white"
+                    ariaLabel={t("pets.form.owner")}
                     required
                   />
                   {owners.length === 0 && (
@@ -548,6 +632,87 @@ export default function Appointments() {
                   className="h-11 rounded-xl bg-brand-600 font-semibold hover:bg-brand-700"
                 >
                   {savingPet ? t("common.saving") : t("appointments.quickPet.create")}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body,
+      )}
+      {showQuickOwner && createPortal(
+        <div
+          className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-black/45 p-4 backdrop-blur-sm"
+          onClick={() => setShowQuickOwner(false)}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-dark-100 px-6 py-4">
+              <div>
+                <h2 className="font-bold text-dark-900">{t("appointments.quickOwner.title")}</h2>
+                <p className="mt-0.5 text-xs text-dark-400">{t("appointments.quickOwner.hint")}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickOwner(false)}
+                aria-label={t("common.close")}
+                className="flex size-8 items-center justify-center rounded-xl bg-dark-100 text-dark-400 transition-colors hover:bg-dark-200 hover:text-dark-700"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <form onSubmit={handleQuickOwnerSubmit}>
+              <div className="space-y-4 px-6 py-5">
+                {ownerError && (
+                  <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {ownerError}
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-owner-name" className="text-xs font-semibold text-dark-600">{t("owners.form.name")} *</Label>
+                  <Input
+                    id="quick-owner-name"
+                    value={ownerForm.name}
+                    onChange={(event) => setOwnerForm({ ...ownerForm, name: event.target.value })}
+                    className="h-11 rounded-xl"
+                    autoFocus
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-owner-phone" className="text-xs font-semibold text-dark-600">{t("owners.form.phone")}</Label>
+                  <Input
+                    id="quick-owner-phone"
+                    type="tel"
+                    value={ownerForm.phone}
+                    onChange={(event) => setOwnerForm({ ...ownerForm, phone: event.target.value })}
+                    placeholder={t("owners.form.phonePlaceholder")}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="quick-owner-email" className="text-xs font-semibold text-dark-600">{t("owners.form.email")}</Label>
+                  <Input
+                    id="quick-owner-email"
+                    type="email"
+                    value={ownerForm.email}
+                    onChange={(event) => setOwnerForm({ ...ownerForm, email: event.target.value })}
+                    placeholder={t("owners.form.emailPlaceholder")}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 border-t border-dark-100 px-6 py-4">
+                <Button type="button" variant="outline" onClick={() => setShowQuickOwner(false)} className="h-11 rounded-xl">
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingOwner}
+                  className="h-11 rounded-xl bg-brand-600 font-semibold hover:bg-brand-700"
+                >
+                  {savingOwner ? t("common.saving") : t("appointments.quickOwner.create")}
                 </Button>
               </div>
             </form>

@@ -26,7 +26,7 @@ A pipeline `.github/workflows/ci.yml` executa estes gates e um smoke test HTTP d
 | RF-05 Ciclo de atendimento | matriz em `test_appointments.py` e sincronização em `test_waiting_room.py` |
 | RF-06 Histórico clínico | `test_treatments.py`, `test_history.py`, `test_clinical.py`, `test_encounters.py` |
 | RF-07 Dashboard | `test_integration.py::test_07_dashboard` e fluxo vertical real |
-| RF-08 Faturação mock | `test_invoices.py`, incluindo tenant, cancelamento terminal e adaptador mock |
+| RF-08 Integração de faturação | `test_invoices.py`, incluindo linhas, subtotal provisório, NIF, contrato de preview, payable de FR, chaves idempotentes distintas, cotação inválida, tenant, legados, anulação externa e adaptador mock |
 | RF-09 Utilizadores | `test_users.py`, `test_auth.py::test_temporary_password_change_and_logout_revoke_both_tokens`, `Users.test.tsx` |
 | RF-10 Sala de espera e serviços | `test_waiting_room.py`, `test_encounters.py::test_admin_can_configure_service_and_exam_catalog` |
 | RF-11 Atendimento estruturado | `test_encounters.py`, `test_clinical.py`, `test_integration.py::test_10_vertical_mvp_flow` |

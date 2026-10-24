@@ -92,6 +92,7 @@ The root owns cross-domain architecture, repository-wide conventions, local deve
 - Protected endpoints accept access tokens only. Refresh re-loads the current user and rotates tokens; logout revokes both the presented access and refresh tokens.
 - Owners and pets use audited logical archive. Archived entities remain readable in history, are excluded from default lists, and cannot originate new consultations or invoices.
 - Appointment and waiting-room state changes go through the shared transition contract; terminal clinical/financial records are never physically deleted.
+- PATAS prepares itemized billing payloads and delegates fiscal document issuance to a configured third-party adapter; provider references and document metadata are preserved locally. Vendas remains authoritative for tax and payable totals; every FT/FR emission uses a persisted provider preview and a separate emission idempotency key.
 - Agenda, dashboard, and waiting-room boundaries use `Africa/Luanda`; persisted instants use UTC.
 - The LAN pilot profile exposes HTTP/80 only, runs Alembic as a blocking one-shot service, and requires PostgreSQL backup plus a documented restore rehearsal before real data.
 - Do not add code comments unless the logic is non-obvious.

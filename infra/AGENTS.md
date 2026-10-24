@@ -17,6 +17,7 @@ This boundary owns deployment topology and operational wiring. Application behav
 - The private-LAN pilot publishes only nginx HTTP/80. PostgreSQL, Redis, backend, and frontend stay internal.
 - `migrate` is a one-shot Alembic gate and backend startup depends on its successful completion; runtime startup must not create tables.
 - Backup output stays outside version control; restore requires an explicit confirmation variable and reapplies migrations before restart.
+- Vendas integration settings and API keys are injected only into the backend; the frontend receives no provider credential.
 
 ## Work Guidance
 

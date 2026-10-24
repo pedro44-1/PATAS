@@ -318,12 +318,17 @@ Animais arquivados não podem originar novas consultas ou faturas. Use `?include
 
 ## Appointments
 
-### List (filter by date)
+### List (filter by date or interval)
 
 ```bash
 curl -X GET "http://localhost:8000/api/v1/appointments/?date=2026-07-21" \
   -H "Authorization: Bearer <token>"
+
+curl -X GET "http://localhost:8000/api/v1/appointments/?date_from=2026-07-21&date_to=2026-07-27" \
+  -H "Authorization: Bearer <token>"
 ```
+
+`date` preserves the single-day filter. For an inclusive interval, send both `date_from` and `date_to`; incomplete, reversed, or mixed single-date/range filters return `422`.
 
 ### Create
 
@@ -442,11 +447,15 @@ curl -X POST http://localhost:8000/api/v1/invoices/ \
   -d '{
     "owner_id": 1,
     "appointment_id": 1,
-    "amount": 8500.0,
-    "description": "Vacinação V10 + consulta",
-    "reason": null
+    "payment_method": "tpa",
+    "items": [
+      {"description": "Consulta", "quantity": 1, "unit_price": 6000, "tax_rate": 0},
+      {"description": "Vacinação V10", "quantity": 1, "unit_price": 2500, "tax_rate": 0}
+    ]
   }'
 ```
+
+O dono precisa de NIF. O servidor calcula um subtotal comercial provisório; `tax_rate` deve ser zero porque IVA, retenções e total fiscal são calculados pelo Vendas. `amount` e `description` continuam aceites como formato legado e são convertidos numa linha única.
 
 ### Get by ID
 
@@ -461,21 +470,47 @@ curl -X GET http://localhost:8000/api/v1/invoices/1 \
 curl -X PATCH http://localhost:8000/api/v1/invoices/1 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"status": "paid"}'
+  -d '{"status": "cancelled", "reason": "Documento criado por engano"}'
 ```
 
 Status values: `draft`, `sent`, `paid`, `cancelled`.
 
-**Note:** When setting `status: "cancelled"`, you must provide a `reason`.
+**Note:** `cancelled` exige `reason` e só é permitido antes da emissão externa. `paid` não pode ser definido manualmente no PATAS.
 
-Invoice statuses are `draft`, `sent`, `paid` and `cancelled`. The mock payment adapter can be called with:
+O PATAS prepara linhas e preços líquidos. Antes da emissão, obtenha a prévia fiscal:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/invoices/1/preview \
+  -H "Authorization: Bearer <token>"
+```
+
+A resposta preserva `quote_id`, `quote_expires_at`, `quote_vat_configuration_version`, `quote_calculation_digest` e `quote_payable`. A cotação dura dez minutos. Depois de confirmar o valor, emita com:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/invoices/1/sync \
   -H "Authorization: Bearer <token>"
 ```
 
-The response contains `external_reference` and `sync_status`. No real payment is processed by PATAS.
+A resposta contém `external_reference`, `sync_status`, `provider_status`, `provider_mode`, `series`, `document_number` e `document_url` quando o provedor os devolver. O provedor `mock` é usado por omissão; `BILLING_PROVIDER=vendas` ativa o cliente server-to-server. O PATAS não cria a fatura fiscal.
+
+O cliente Vendas chama primeiro `POST /api/integrations/v1/invoices/preview` e depois `POST /api/integrations/v1/invoices`. Cada pedido usa uma `Idempotency-Key` UUID persistida e distinta. FT omite pagamento; FR envia um tender exatamente igual ao `quote_payable`. A chave Vendas precisa dos escopos `invoice.issue`, `invoice.read`, `customer.upsert` e `product.upsert`; numerário acrescenta `cash.operate` e uma sessão aberta.
+
+O payload externo serializa quantidades, preços, descontos e pagamentos como strings decimais exatas. Cada linha recebe código de até 64 caracteres, unidade de até 12 e `vatProfileCode` de até 80; o perfil pode ser indicado por linha ou herdado da configuração predefinida. Na ausência de código, o PATAS gera um identificador determinístico por clínica, tipo e descrição, evitando criar um artigo novo por fatura. Campos opcionais sem valor são omitidos. FR suporta `CASH`, `CARD` e `TRANSFER`; `other` é rejeitado. A referência legível devolvida pelo Vendas é apresentada como número do documento; `seriesId` permanece metadado interno.
+
+`VAT_PROFILE_REQUIRED` pede configuração comercial no Vendas. `QUOTE_NOT_FOUND`, `QUOTE_EXPIRED`, `QUOTE_MISMATCH` e `QUOTE_STALE` invalidam a cotação local e exigem nova prévia. Um timeout de emissão reutiliza exatamente o mesmo corpo e chave para evitar duplicação.
+
+Variáveis do backend: `BILLING_PROVIDER`, `VENDAS_BASE_URL`, `VENDAS_API_KEY`, `VENDAS_OPERATION_TYPE`, `VENDAS_DEFAULT_VAT_PROFILE_CODE`, `VENDAS_CASH_SESSION_ID` e `VENDAS_REQUEST_TIMEOUT_SECONDS`. O modo atual do Vendas é `TRAINING` e não produz documentos com validade fiscal.
+
+### Dados da clínica para faturação
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/clinics/me \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"nif": "5000000000", "billing_store_external_id": "clinica-luanda"}'
+```
+
+`GET /api/v1/clinics/me` está disponível para utilizadores autenticados; apenas administradores alteram os dados.
 
 ```bash
 curl -X PATCH http://localhost:8000/api/v1/invoices/1 \
@@ -491,7 +526,7 @@ curl -X DELETE http://localhost:8000/api/v1/invoices/1 \
   -H "Authorization: Bearer <token>"
 ```
 
-Devolve `405`: use `PATCH` para cancelar com motivo. `paid` e `cancelled` são terminais.
+Devolve `405`: use `PATCH` para cancelar um rascunho com motivo. Um documento já aceite pelo Vendas exige anulação ou nota de crédito no provedor. `paid` e `cancelled` são terminais.
 
 ---
 

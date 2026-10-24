@@ -95,3 +95,22 @@ def test_owners_scoped_by_clinic(client, vet_headers, owner, db_session):
     ids = [o["id"] for o in data]
     assert owner.id in ids
     assert other_owner.id not in ids
+
+
+def test_owner_blank_optional_fields_are_stored_as_null(client, vet_headers):
+    created = client.post("/api/v1/owners/", headers=vet_headers, json={
+        "name": "Sem Email",
+        "phone": "",
+        "email": "",
+        "address": "  ",
+        "nif": "",
+        "notes": "",
+    })
+    assert created.status_code == 200
+    data = created.json()
+    assert data["email"] is None
+    assert data["address"] is None
+
+    updated = client.patch(f"/api/v1/owners/{data['id']}", headers=vet_headers, json={"email": ""})
+    assert updated.status_code == 200
+    assert updated.json()["email"] is None

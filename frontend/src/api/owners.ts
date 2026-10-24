@@ -7,6 +7,7 @@ export interface Owner {
   phone: string | null;
   email: string | null;
   address: string | null;
+  nif: string | null;
   notes: string | null;
   archived_at: string | null;
   archived_by_user_id: number | null;
@@ -18,6 +19,7 @@ export interface OwnerCreate {
   phone?: string;
   email?: string;
   address?: string;
+  nif?: string;
   notes?: string;
 }
 

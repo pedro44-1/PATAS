@@ -15,6 +15,7 @@ This folder owns source declarations only. Package configuration and generated o
 - Export new public types from `index.ts` when they are intended for general consumers.
 - Keep queue, exam-finding, and clinical-medication status literals synchronized with backend enums.
 - User types include clinic identity and `must_change_password`; owner/pet types include archive metadata used by history and default-list filtering.
+- Invoice types include line items, provisional totals, provider quote metadata/payable, party snapshots, payment method, and external-provider document metadata. Response `Decimal` amounts are serialized as strings; request amounts remain numeric inputs.
 
 ## Work Guidance
 

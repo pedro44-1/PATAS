@@ -100,3 +100,11 @@ def test_treatments_scoped_by_clinic(client, vet_headers, treatment, db_session)
     ids = [t["id"] for t in response.json()]
     assert treatment.id in ids
     assert other_treatment.id not in ids
+
+
+def test_second_treatment_for_same_appointment_conflicts(client, vet_headers, treatment):
+    response = client.post("/api/v1/treatments/", headers=vet_headers, json={
+        "appointment_id": treatment.appointment_id,
+        "diagnosis": "Duplicado",
+    })
+    assert response.status_code == 409

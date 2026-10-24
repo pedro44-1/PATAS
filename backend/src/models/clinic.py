@@ -14,6 +14,8 @@ class Clinic(Base):
     address = Column(String(500), nullable=True)
     phone = Column(String(50), nullable=True)
     email = Column(String(255), nullable=True)
+    nif = Column(String(30), nullable=True)
+    billing_store_external_id = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     users = relationship("User", back_populates="clinic")
@@ -22,6 +24,7 @@ class Clinic(Base):
     appointments = relationship("Appointment", back_populates="clinic")
     treatments = relationship("Treatment", back_populates="clinic")
     invoices = relationship("Invoice", back_populates="clinic")
+    invoice_lines = relationship("InvoiceLine", back_populates="clinic")
     service_types = relationship("ServiceType", back_populates="clinic")
     waiting_room_entries = relationship("WaitingRoomEntry", back_populates="clinic")
     exam_systems = relationship("ClinicalExamSystem", back_populates="clinic")

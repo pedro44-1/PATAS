@@ -43,16 +43,16 @@ def test_receptionist_can_read_but_not_write_clinical_record(client, appointment
     assert write.status_code == 403
 
 
-def test_admin_can_configure_service_and_exam_catalog(client, vet_headers):
-    service = client.post("/api/v1/service-types/", json={"name": "Internamento"}, headers=vet_headers)
+def test_admin_can_configure_service_and_exam_catalog(client, admin_headers):
+    service = client.post("/api/v1/service-types/", json={"name": "Internamento"}, headers=admin_headers)
     assert service.status_code == 200
     assert service.json()["slug"] == "internamento"
 
-    system = client.post("/api/v1/exam-catalog/systems", json={"name": "Avaliação neurológica"}, headers=vet_headers)
+    system = client.post("/api/v1/exam-catalog/systems", json={"name": "Avaliação neurológica"}, headers=admin_headers)
     assert system.status_code == 200
     finding = client.post(
         f"/api/v1/exam-catalog/systems/{system.json()['id']}/findings",
         json={"name": "Marcha alterada"},
-        headers=vet_headers,
+        headers=admin_headers,
     )
     assert finding.status_code == 200

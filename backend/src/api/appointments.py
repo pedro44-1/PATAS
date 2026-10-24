@@ -58,6 +58,8 @@ def _validate_service_type(db: Session, clinic_id: int, service_type_id: int | N
 @router.get("/", response_model=list[AppointmentResponse])
 def list_appointments(
     date: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     skip: int = 0,
     limit: int = 100,
     current_user: CurrentUser = Depends(get_current_user),
@@ -68,8 +70,21 @@ def list_appointments(
         joinedload(Appointment.owner),
         joinedload(Appointment.vet),
     ).filter(Appointment.clinic_id == current_user.clinic_id)
+    if date and (date_from or date_to):
+        raise HTTPException(status_code=422, detail="Use uma data única ou um intervalo, não ambos")
     if date:
         start, end = local_day_bounds(date, error_detail="A data da agenda é inválida")
+        query = query.filter(
+            Appointment.scheduled_at >= start,
+            Appointment.scheduled_at < end,
+        )
+    elif date_from or date_to:
+        if not date_from or not date_to:
+            raise HTTPException(status_code=422, detail="Indique a data inicial e a data final")
+        start, _ = local_day_bounds(date_from, error_detail="A data inicial é inválida")
+        _, end = local_day_bounds(date_to, error_detail="A data final é inválida")
+        if start >= end:
+            raise HTTPException(status_code=422, detail="A data inicial não pode ser posterior à data final")
         query = query.filter(
             Appointment.scheduled_at >= start,
             Appointment.scheduled_at < end,

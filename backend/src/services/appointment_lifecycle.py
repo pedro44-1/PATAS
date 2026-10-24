@@ -3,10 +3,12 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from src.core.timezones import utc_naive
+from src.core.timezones import stored_utc, utc_naive
 from src.models.appointment import Appointment, AppointmentStatus
 from src.models.user import UserRole
 from src.models.waiting_room import WaitingRoomEntry, WaitingRoomStatus
+
+MAX_APPOINTMENT_DURATION = timedelta(minutes=480)
 
 APPOINTMENT_TRANSITIONS = {
     AppointmentStatus.SCHEDULED: {
@@ -52,11 +54,13 @@ def ensure_no_appointment_conflict(
         Appointment.clinic_id == clinic_id,
         Appointment.vet_id == vet_id,
         Appointment.status.notin_([AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW]),
+        Appointment.scheduled_at < end,
+        Appointment.scheduled_at > start - MAX_APPOINTMENT_DURATION,
     )
     if exclude_id is not None:
         query = query.filter(Appointment.id != exclude_id)
     for existing in query.all():
-        existing_start = utc_naive(existing.scheduled_at)
+        existing_start = stored_utc(existing.scheduled_at)
         existing_end = existing_start + timedelta(minutes=existing.duration_min or 30)
         if start < existing_end and end > existing_start:
             raise HTTPException(status_code=409, detail="O veterinário já tem uma consulta nesse horário")

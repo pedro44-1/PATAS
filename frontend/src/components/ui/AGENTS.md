@@ -14,7 +14,8 @@ These components own generic visual behavior and accessibility wiring. They do n
 - Keep Radix/shadcn-style behavior, Tailwind classes, and keyboard/focus behavior consistent with the existing components.
 - Keep visible text configurable by callers so localization remains at the feature/page layer.
 - Tables retain semantic desktop markup and present rows as touch-friendly cards below the mobile breakpoint.
-- Form dropdowns use `FormSelect`, whose portalled popup must remain visible above dialogs and scroll containers; domain workflows may add a visually distinct action option without replacing normal selection behavior.
+- `FormError` renders a request error inside the open form or dialog; modal submit errors must never render only behind the overlay.
+- Form dropdowns use `FormSelect`, whose portalled popup must remain visible above nested dialogs and scroll containers; domain workflows may place a visually distinct action option first without replacing normal selection behavior.
 
 ## Work Guidance
 

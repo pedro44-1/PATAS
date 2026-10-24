@@ -17,5 +17,14 @@ export function apiErrorMessage(
   if (!axios.isAxiosError(error)) return String(t(fallbackKey));
   const status = error.response?.status;
   if (!status) return String(t(fallbackKey));
-  return String(t(statusKeys[status] ?? DEFAULT_STATUS_KEYS[status] ?? fallbackKey));
+  if (statusKeys[status]) return String(t(statusKeys[status]));
+  const detail = serverDetail(error.response?.data);
+  if (detail && status !== 401) return detail;
+  return String(t(DEFAULT_STATUS_KEYS[status] ?? fallbackKey));
+}
+
+function serverDetail(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const detail = (data as { detail?: unknown }).detail;
+  return typeof detail === "string" && /\s/.test(detail.trim()) ? detail : null;
 }

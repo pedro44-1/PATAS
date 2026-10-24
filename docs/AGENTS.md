@@ -26,4 +26,4 @@ Review changed commands and endpoint examples against the current source/configu
 
 ## Child DOX Index
 
-No child DOX documents. Current documents are `setup.md`, `api.md`, `requisitos-funcionais.md`, `matriz-rastreabilidade.md`, `operacao-piloto.md`, and `issues-funcionais.md`.
+No child DOX documents. Current documents are `setup.md`, `api.md`, `requisitos-funcionais.md`, `matriz-rastreabilidade.md`, `operacao-piloto.md`, `issues-funcionais.md`, and `plano-faturacao-operacional.md`.

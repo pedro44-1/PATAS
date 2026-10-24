@@ -21,7 +21,11 @@ Pages own screen composition, user-flow state, and route-level loading/error/emp
 - Receptionists may operate scheduling, arrival/call, owner/pet and invoice workflows but clinical content stays read-only; start/complete controls belong to vets/admins.
 - Admin user creation uses a temporary password without re-displaying or retaining it after a successful request.
 - Owner/pet removal is presented as archive; treatment/invoice physical deletion controls do not exist.
-- Appointment creation offers quick animal registration from the animal selector, preserves the appointment draft, and automatically selects the newly created animal.
+- Appointment creation presents quick animal registration as the first animal-selector option. Its owner selector presents quick owner registration first; both nested flows preserve their parent drafts and automatically select the created record.
+- The appointments page filters the agenda with an inclusive start/end date interval and defaults both boundaries to the current Luanda clinic date.
+- Invoice preparation collects owner NIF, optional appointment, document/payment type, and repeatable product/service lines. The local subtotal is provisional; issuance requires a valid Vendas preview and shows its authoritative payable. The pending collection summary counts only issued FT and uses the Vendas payable, never draft subtotals.
+- Show local cancellation only for invoice drafts; an issued Vendas document requires an external correction flow.
+- Interpret quote expiry values without a timezone as UTC, matching the backend's stored UTC timestamps.
 
 ## Work Guidance
 

@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { apiErrorMessage } from "@/api/errors";
+import { FormError } from "@/components/ui/form-error";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { petsApi, Pet, PetCreate } from "@/api/pets";
@@ -60,6 +62,7 @@ export default function Pets() {
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
   // Form state
   const [form, setForm] = useState({
@@ -123,7 +126,7 @@ export default function Pets() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError("");
+    setFormError("");
     try {
       const payload: PetCreate = {
         owner_id: form.owner_id,
@@ -140,8 +143,8 @@ export default function Pets() {
       }
       setShowForm(false);
       load();
-    } catch {
-      setError(t("pets.error"));
+    } catch (requestError: unknown) {
+      setFormError(apiErrorMessage(requestError, t, "pets.error"));
     } finally {
       setSaving(false);
     }
@@ -152,8 +155,8 @@ export default function Pets() {
     try {
       await petsApi.delete(id);
       load();
-    } catch {
-      setError(t("pets.error"));
+    } catch (requestError: unknown) {
+      setError(apiErrorMessage(requestError, t, "pets.error"));
     }
   }
 
@@ -308,6 +311,7 @@ export default function Pets() {
 
             {/* Modal body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              <FormError message={formError} />
               {/* Owner */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-dark-600">

@@ -39,6 +39,7 @@
     "registerHint": "Registe a clínica e a primeira conta de administrador.",
     "registerError": "Não foi possível criar a clínica.",
     "clinicName": "Nome da clínica",
+    "clinicNif": "NIF da clínica",
     "adminName": "Nome do administrador",
     "passwordRules": "Mínimo de 8 caracteres, com uma maiúscula e um número.",
     "createClinic": "Criar clínica",
@@ -102,6 +103,11 @@
     "noResults": "Nenhuma consulta para este dia",
     "create": "Registar Consulta",
     "saving": "A agendar...",
+    "dateRange": {
+      "from": "Data inicial",
+      "to": "Data final",
+      "label": "{{start}} a {{end}}"
+    },
     "form": {
       "animal": "Animal",
       "selectAnimal": "Selecionar animal",
@@ -123,6 +129,12 @@
       "title": "Registo rápido de animal",
       "hint": "Crie o animal sem perder os dados da consulta.",
       "noOwners": "É necessário ter um dono registado para criar o animal.",
+      "createOwner": "Registar novo dono",
+      "create": "Registar e selecionar"
+    },
+    "quickOwner": {
+      "title": "Registo rápido de dono",
+      "hint": "Crie o dono sem perder os dados do animal e da consulta.",
       "create": "Registar e selecionar"
     },
     "table": {
@@ -173,6 +185,8 @@
       "emailPlaceholder": "email@exemplo.com",
       "address": "Endereço",
       "addressPlaceholder": "Rua, número, bairro",
+      "nif": "NIF",
+      "nifPlaceholder": "NIF do dono",
       "notes": "Notas",
       "notesPlaceholder": "Notas adicionais"
     },
@@ -320,7 +334,8 @@
       "diagnosis": "Diagnóstico",
       "prescription": "Prescrição",
       "actions": "Ações"
-    }
+    },
+    "error": "Não foi possível guardar o tratamento."
   },
   "invoices": {
     "title": "Faturas",
@@ -331,8 +346,12 @@
     "createHint": "Emitir uma nova fatura",
     "issue": "Emitir Fatura",
     "issuing": "A emitir...",
+    "saveDraft": "Guardar rascunho",
+    "savingDraft": "A guardar...",
     "cancelReason": "Indique o motivo do cancelamento:",
     "error": "Não foi possível atualizar a fatura.",
+    "previewError": "Não foi possível calcular a prévia fiscal no Vendas.",
+    "trainingNotice": "Integração de faturação em modo de ensaio. O Vendas em TRAINING não produz documentos com validade fiscal.",
     "pendingAlert": {
       "label": "Total pendente de cobrança",
       "hint_one": "{{amount}} Kz em {{count}} fatura não paga",
@@ -348,10 +367,46 @@
     "form": {
       "owner": "Dono",
       "selectOwner": "Selecionar dono",
-      "amount": "Valor (Kz)",
-      "amountPlaceholder": "2500",
+      "appointment": "Consulta",
+      "noAppointment": "Sem consulta associada",
+      "paymentMethod": "Método de pagamento",
+      "cashSessionHint": "Numerário exige uma sessão de caixa aberta no Vendas.",
+      "documentType": "Tipo de documento",
+      "missingNif": "Adicione o NIF deste dono antes de preparar a fatura.",
+      "items": "Produtos e serviços",
+      "itemsHint": "Estes dados serão enviados ao software de faturação.",
+      "addItem": "Adicionar linha",
+      "kind": "Tipo",
       "description": "Descrição",
-      "descriptionPlaceholder": "Descrição da factura"
+      "quantity": "Quantidade",
+      "unitPrice": "Preço unitário",
+      "vatProfile": "Perfil IVA",
+      "vatProfileDefault": "Predefinido",
+      "taxRate": "Imposto (%)"
+    },
+    "documentType": {
+      "FT": "Fatura (FT) — pagamento posterior",
+      "FR": "Fatura-recibo (FR) — pagamento imediato"
+    },
+    "lineKind": {
+      "SERVICE": "Serviço",
+      "PRODUCT": "Produto"
+    },
+    "paymentMethod": {
+      "cash": "Numerário",
+      "bank-transfer": "Transferência bancária",
+      "tpa": "TPA",
+      "other": "Outro"
+    },
+    "summary": {
+      "subtotal": "Subtotal",
+      "tax": "Imposto",
+      "total": "Total",
+      "commercialSubtotal": "Subtotal comercial",
+      "providerTotalHint": "O IVA e o total fiscal definitivo são calculados pelo Vendas no momento da emissão."
+    },
+    "quote": {
+      "providerTotal": "Total calculado pelo Vendas"
     },
     "table": {
       "number": "Nº",
@@ -369,10 +424,12 @@
       "cancelled": "Cancelada"
     },
     "actions": {
-      "send": "Enviar",
+      "preview": "Calcular no Vendas",
+      "send": "Emitir no Vendas",
       "sendHint": "Enviar para o sistema de pagamentos",
       "markPaid": "Paga",
-      "markPaidHint": "Marcar como paga"
+      "markPaidHint": "Marcar como paga",
+      "openDocument": "Abrir documento emitido"
     }
   },
   "clinical": {
@@ -560,6 +617,12 @@
     "currencyValue": "AOA — Kwanza angolano",
     "timezone": "Fuso horário",
     "timezoneValue": "Africa/Luanda",
+    "billingNif": "NIF da clínica para faturação",
+    "billingNifPlaceholder": "NIF da entidade emitente",
+    "billingNifHint": "É necessário para preparar a fatura. A entidade emitente deve corresponder à empresa configurada no Vendas.",
+    "billingStoreId": "Identificador da loja no Vendas",
+    "billingStoreIdPlaceholder": "storeExternalId atribuído pelo Vendas",
+    "billingStoreIdHint": "Associa os pedidos do PATAS à loja correta no Vendas.",
     "catalog": {
       "servicesTitle": "Tipos de serviço",
       "servicesHint": "Categorias usadas na agenda e sala de espera.",

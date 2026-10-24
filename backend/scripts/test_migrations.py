@@ -22,7 +22,7 @@ def test_migrations():
     settings.DATABASE_URL = pg_url
     command.upgrade(cfg, "head", sql=True)
     
-    print("\n✓ All migration SQL generated successfully for PostgreSQL")
+    print("\nOK: all migration SQL generated successfully for PostgreSQL")
 
 
 if __name__ == "__main__":
