@@ -765,3 +765,11 @@ def test_reconciliation_job_only_promotes_paid_ft(db_session, invoice):
     assert result == {"checked": 1, "paid": 1, "failed": 0}
     assert invoice.status == InvoiceStatus.PAID
     assert invoice.paid_at is not None
+
+
+def test_preview_requires_issuer_nif_before_offering_emission(client, vet_headers, invoice, clinic, db_session):
+    clinic.nif = None
+    db_session.commit()
+    response = client.post(f"/api/v1/invoices/{invoice.id}/preview", headers=vet_headers)
+    assert response.status_code == 422
+    assert "NIF" in response.json()["detail"]

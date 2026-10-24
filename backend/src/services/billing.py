@@ -189,6 +189,10 @@ def _stable_product_external_id(line: InvoiceLine, code: str) -> str:
 
 
 def build_billing_preview_payload(invoice: Invoice) -> BillingPreviewPayload:
+    if not invoice.issuer_name or not invoice.issuer_nif:
+        raise ValueError("A clínica precisa de nome e NIF para emitir a fatura")
+    if not invoice.customer_name or not invoice.customer_nif:
+        raise ValueError("O cliente precisa de nome e NIF para emitir a fatura")
     if not invoice.issuer_store_external_id:
         raise ValueError("A clínica precisa do identificador de loja do Vendas")
     if not invoice.lines:

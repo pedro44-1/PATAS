@@ -100,6 +100,7 @@ class TestFullFlow:
             "name": "João Teste",
             "phone": "+244 900 111 222",
             "email": "joao.crud@test.ao",
+            "nif": "5417000001",
         }, headers=h)
         assert owner_resp.status_code == 200, f"create owner: {owner_resp.text}"
         owner = owner_resp.json()
@@ -171,29 +172,52 @@ class TestFullFlow:
         assert txs_resp.status_code == 200
         assert any(t["id"] == tx_id for t in txs_resp.json())
 
-        # Create invoice
+        # Configure the clinic store and create an itemized invoice
+        store_resp = api.patch(_url("/clinics/me"), json={
+            "nif": "5000000001",
+            "billing_store_external_id": "patas-integration-store",
+        }, headers=h)
+        assert store_resp.status_code == 200, f"configure store: {store_resp.text}"
         inv_resp = api.post(_url("/invoices/"), json={
             "owner_id": owner_id,
             "appointment_id": appt_id,
-            "amount": 8500.0,
-            "description": "Vacinação + consulta",
+            "items": [{
+                "description": "Vacinação + consulta",
+                "kind": "SERVICE",
+                "unit": "UN",
+                "quantity": 1,
+                "unit_price": 8500,
+                "tax_rate": 0,
+                "vat_profile_code": "VAT-STD",
+            }],
         }, headers=h)
         assert inv_resp.status_code == 200, f"create invoice: {inv_resp.text}"
         inv = inv_resp.json()
-        assert inv["amount"] == 8500.0
+        assert float(inv["amount"]) == 8500.0
         inv_id = inv["id"]
+
+        duplicate_resp = api.post(_url("/invoices/"), json={
+            "owner_id": owner_id,
+            "appointment_id": appt_id,
+            "items": [{"description": "Duplicada", "kind": "SERVICE", "unit": "UN", "quantity": 1, "unit_price": 1, "tax_rate": 0}],
+        }, headers=h)
+        assert duplicate_resp.status_code == 409, f"duplicate invoice: {duplicate_resp.text}"
 
         # List invoices
         invs_resp = api.get(_url("/invoices/"), headers=h)
         assert invs_resp.status_code == 200
         assert any(i["id"] == inv_id for i in invs_resp.json())
 
-        # Update invoice status to paid
-        update_resp = api.patch(_url(f"/invoices/{inv_id}"), json={
-            "status": "paid",
-        }, headers=h)
-        assert update_resp.status_code == 200, f"update invoice: {update_resp.text}"
-        assert update_resp.json()["status"] == "paid"
+        # Payment is never set locally; issue through the provider instead
+        manual_paid = api.patch(_url(f"/invoices/{inv_id}"), json={"status": "paid"}, headers=h)
+        assert manual_paid.status_code == 409, f"manual paid: {manual_paid.text}"
+        preview_resp = api.post(_url(f"/invoices/{inv_id}/preview"), headers=h)
+        assert preview_resp.status_code == 200, f"preview invoice: {preview_resp.text}"
+        sync_resp = api.post(_url(f"/invoices/{inv_id}/sync"), headers=h)
+        assert sync_resp.status_code == 200, f"issue invoice: {sync_resp.text}"
+        assert sync_resp.json()["status"] == "sent"
+        reconcile_resp = api.post(_url(f"/invoices/{inv_id}/reconcile"), headers=h)
+        assert reconcile_resp.status_code == 200, f"reconcile invoice: {reconcile_resp.text}"
 
         # Start and complete the appointment through the lifecycle
         start_resp = api.patch(_url(f"/appointments/{appt_id}"), json={
@@ -372,6 +396,7 @@ class TestFullFlow:
         owner_response = api.post(_url("/owners/"), headers=reception_headers, json={
             "name": "Dona Vertical",
             "phone": "+244 923 000 001",
+            "nif": "004567890LA042",
         })
         assert owner_response.status_code == 200, owner_response.text
         owner = owner_response.json()
