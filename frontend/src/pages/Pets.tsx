@@ -10,6 +10,7 @@ import { petsApi, Pet, PetCreate } from "@/api/pets";
 import { ownersApi, Owner } from "@/api/owners";
 import { OPTIONS_LIMIT, PAGE_SIZE, totalCount } from "@/api/pagination";
 import { ListPagination } from "@/components/ListPagination";
+import { formatDateOnly } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,7 @@ const SPECIES_OPTIONS = [
 
 function calculateAge(birthDate: string | null, translate: (key: string, options?: Record<string, unknown>) => string): string {
   if (!birthDate) return "—";
-  const birth = new Date(birthDate);
+  const birth = new Date(`${birthDate.slice(0, 10)}T12:00:00`);
   const today = new Date();
   const totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
   if (totalMonths < 1) return translate("pets.age.lessThanMonth");
@@ -265,7 +266,7 @@ export default function Pets() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium text-sm text-dark-700">{p.species}</div>
+                      <div className="font-medium text-sm text-dark-700">{t(`pets.species.${p.species}`, { defaultValue: p.species })}</div>
                       <div className="text-dark-400 text-xs">{p.breed ?? "—"}</div>
                     </TableCell>
                     <TableCell>
@@ -426,7 +427,7 @@ export default function Pets() {
                     {t("pets.form.ageDisplay", { age: calculateAge(form.birth_date, t) })}
                   </p>
                   <p className="text-brand-600 text-xs mt-0.5">
-                    {new Date(form.birth_date).toLocaleDateString("pt-AO", { year: "numeric", month: "long", day: "numeric" })}
+                    {formatDateOnly(form.birth_date, { year: "numeric", month: "long", day: "numeric" })}
                   </p>
                 </div>
               )}

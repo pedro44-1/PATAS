@@ -1,10 +1,10 @@
 import enum
-from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String, true
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class UserRole(str, enum.Enum):
@@ -29,7 +29,7 @@ class User(Base):
     must_change_password = Column(Boolean, nullable=False, default=False)
     is_active = Column(Boolean, nullable=False, default=True, server_default=true())
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="users")
     appointments = relationship("Appointment", back_populates="vet")

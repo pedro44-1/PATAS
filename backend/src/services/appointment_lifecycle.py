@@ -1,9 +1,9 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from src.core.timezones import stored_utc, utc_naive
+from src.core.timezones import stored_utc, utc_naive, utc_now
 from src.models.appointment import Appointment, AppointmentStatus
 from src.models.user import UserRole
 from src.models.waiting_room import WaitingRoomEntry, WaitingRoomStatus
@@ -137,7 +137,7 @@ def transition_appointment(
         return
 
     entry = appointment.waiting_room_entry
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = utc_now()
     target_status = WaitingRoomStatus(next_status.value)
     entry.status = target_status.value
     entry.status_reason = normalized_reason
@@ -169,7 +169,7 @@ def transition_waiting_room(
         ensure_active_subject(entry.appointment)
     normalized_reason = _validated_reason(next_status, reason)
 
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = utc_now()
     entry.status = next_status.value
     entry.status_reason = normalized_reason
     if next_status == WaitingRoomStatus.CALLED:

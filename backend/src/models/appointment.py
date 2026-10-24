@@ -1,10 +1,10 @@
 import enum
-from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class AppointmentStatus(str, enum.Enum):
@@ -34,7 +34,7 @@ class Appointment(Base):
     status_reason = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
     weight = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="appointments")
     pet = relationship("Pet", back_populates="appointments")

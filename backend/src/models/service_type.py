@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -13,6 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class ServiceType(Base):
@@ -24,7 +24,7 @@ class ServiceType(Base):
     slug = Column(String(100), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="service_types")
     appointments = relationship("Appointment", back_populates="service_type")

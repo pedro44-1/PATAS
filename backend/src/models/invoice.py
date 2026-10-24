@@ -1,11 +1,9 @@
-﻿import enum
-from datetime import UTC, datetime
+import enum
 
 from sqlalchemy import (
     Column,
     DateTime,
     Enum,
-    Float,
     ForeignKey,
     Index,
     Integer,
@@ -18,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class InvoiceStatus(str, enum.Enum):
@@ -57,7 +56,7 @@ class Invoice(Base):
     clinic_id = Column(Integer, ForeignKey("clinics.id"), nullable=False, index=True)
     owner_id = Column(Integer, ForeignKey("owners.id"), nullable=False, index=True)
     appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=True, index=True)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(14, 2), nullable=False)
     subtotal = Column(Numeric(14, 2), nullable=False, default=0)
     tax_total = Column(Numeric(14, 2), nullable=False, default=0)
     status = Column(
@@ -107,7 +106,7 @@ class Invoice(Base):
     reason = Column(String(255), nullable=True)
     external_reference = Column(String(255), nullable=True, unique=True)
     sync_status = Column(Enum(InvoiceSyncStatus), default=InvoiceSyncStatus.PENDING, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="invoices")
     owner = relationship("Owner", back_populates="invoices")

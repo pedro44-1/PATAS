@@ -1,10 +1,10 @@
 import enum
-from datetime import UTC, datetime
 
 from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class VaccinationStatus(str, enum.Enum):
@@ -31,8 +31,8 @@ class Vaccination(Base):
     void_reason = Column(String(1000), nullable=True)
     voided_at = Column(DateTime, nullable=True)
     voided_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     clinic = relationship("Clinic")
     pet = relationship("Pet", back_populates="vaccinations")

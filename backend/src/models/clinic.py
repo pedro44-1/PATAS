@@ -1,9 +1,9 @@
-﻿from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class Clinic(Base):
@@ -16,7 +16,7 @@ class Clinic(Base):
     email = Column(String(255), nullable=True)
     nif = Column(String(30), nullable=True)
     billing_store_external_id = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     users = relationship("User", back_populates="clinic")
     owners = relationship("Owner", back_populates="clinic")

@@ -8,7 +8,7 @@ import { Treatment } from "@/api/treatments";
 import { Medication, Vaccination } from "@/api/clinical";
 import { invoicesApi, Invoice } from "@/api/invoices";
 import { OPTIONS_LIMIT } from "@/api/pagination";
-import { formatKz } from "@/lib/format";
+import { formatDateOnly, formatKz } from "@/lib/format";
 import { useAuth } from "@/contexts/AuthContext";
 import ClinicalHistory from "@/features/pets/ClinicalHistory";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,7 +44,7 @@ import {
 
 function calculateAge(birthDate: string | null, t: (key: string, options?: Record<string, unknown>) => string): string {
   if (!birthDate) return "—";
-  const birth = new Date(birthDate);
+  const birth = new Date(`${birthDate.slice(0, 10)}T12:00:00`);
   const today = new Date();
   const totalMonths = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
   if (totalMonths < 1) return t("pets.age.lessThanMonth");
@@ -82,7 +82,7 @@ function WeightChart({ appointments }: { appointments: Appointment[] }) {
   const { t } = useTranslation();
   const withWeight = appointments
     .filter((a) => a.weight != null)
-    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+    .sort((a, b) => parseApiDate(a.scheduled_at).getTime() - parseApiDate(b.scheduled_at).getTime());
 
   if (withWeight.length === 0) {
     return (
@@ -305,7 +305,7 @@ export default function PetDetail() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-2xl font-extrabold text-dark-900">{pet.name}</h2>
-                  <Badge variant="outline" className="text-xs font-medium">{pet.species}</Badge>
+                  <Badge variant="outline" className="text-xs font-medium">{t(`pets.species.${pet.species}`, { defaultValue: pet.species })}</Badge>
                   {pet.breed && <Badge variant="outline" className="text-xs">{pet.breed}</Badge>}
                   {pet.archived_at && <Badge variant="destructive" className="text-xs">{t("common.archived")}</Badge>}
                 </div>
@@ -313,7 +313,7 @@ export default function PetDetail() {
                   {pet.birth_date && (
                     <span className="flex items-center gap-1.5 text-sm text-dark-500">
                       <CalendarDays className="w-3.5 h-3.5" />
-                      {age} · {t("pets.form.birthDateFormatted", { date: new Date(pet.birth_date).toLocaleDateString("pt-AO") })}
+                      {age} · {t("pets.form.birthDateFormatted", { date: formatDateOnly(pet.birth_date) })}
                     </span>
                   )}
                   {latestWeight && (

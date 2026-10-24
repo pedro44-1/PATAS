@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from src.models.user import UserRole
+from src.schemas.common import OptionalNif
 
 
 def _validate_password(value: str) -> str:
@@ -15,7 +16,7 @@ class ClinicRegistration(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     clinic_name: str = Field(..., min_length=1, max_length=255)
-    clinic_nif: str | None = Field(None, max_length=30)
+    clinic_nif: OptionalNif = Field(None, max_length=30)
     name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)

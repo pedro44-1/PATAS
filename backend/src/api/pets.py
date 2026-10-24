@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session, joinedload
@@ -6,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from src.core.database import get_db
 from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
+from src.core.timezones import utc_now
 from src.models.appointment import Appointment
 from src.models.clinical_exam import ClinicalExamFinding, ClinicalExamObservation, ExamFindingStatus
 from src.models.medication import Medication
@@ -237,7 +237,7 @@ def update_pet(
         action="UPDATE",
         resource="pet",
         resource_id=pet.id,
-        details=updates,
+        details={"fields": sorted(updates)},
         ip_address=request.client.host if request else None,
     )
     return pet
@@ -257,7 +257,7 @@ def delete_pet(
         raise HTTPException(status_code=404, detail="Animal não encontrado")
     if pet.archived_at is not None:
         return {"ok": True, "archived_at": pet.archived_at}
-    archived_at = datetime.now(UTC)
+    archived_at = utc_now()
     pet.archived_at = archived_at
     pet.archived_by_user_id = current_user.id
     db.commit()

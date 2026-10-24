@@ -147,6 +147,9 @@ Headers: `X-Total-Count: 42`
 
 ### Create
 
+`nif` accepts 10 digits (company) or 9 digits + 2 letters + 3 digits (individual) and is stored without separators in uppercase; `phone` accepts 9 digits or an international `+` number. Blank optional fields are stored as `null`.
+
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/owners/ \
   -H "Authorization: Bearer <token>" \

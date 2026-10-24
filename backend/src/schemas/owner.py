@@ -2,24 +2,24 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.schemas.common import OptionalEmail, OptionalText, reject_null
+from src.schemas.common import OptionalEmail, OptionalNif, OptionalPhone, OptionalText, reject_null
 
 
 class OwnerCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    phone: OptionalText = Field(None, max_length=20)
+    phone: OptionalPhone = Field(None, max_length=20)
     email: OptionalEmail = None
     address: OptionalText = Field(None, max_length=500)
-    nif: OptionalText = Field(None, max_length=30)
+    nif: OptionalNif = Field(None, max_length=30)
     notes: OptionalText = Field(None, max_length=1000)
 
 
 class OwnerUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
-    phone: OptionalText = Field(None, max_length=20)
+    phone: OptionalPhone = Field(None, max_length=20)
     email: OptionalEmail = None
     address: OptionalText = Field(None, max_length=500)
-    nif: OptionalText = Field(None, max_length=30)
+    nif: OptionalNif = Field(None, max_length=30)
     notes: OptionalText = Field(None, max_length=1000)
 
     @field_validator("name", mode="before")

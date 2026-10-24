@@ -1,8 +1,8 @@
-﻿from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class AuditLog(Base):
@@ -16,4 +16,4 @@ class AuditLog(Base):
     resource_id = Column(Integer, nullable=True)
     details = Column(Text, nullable=True)
     ip_address = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
+    created_at = Column(DateTime, default=utc_now, index=True)

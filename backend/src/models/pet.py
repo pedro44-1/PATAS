@@ -1,9 +1,9 @@
-from datetime import UTC, datetime
 
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class Pet(Base):
@@ -20,7 +20,7 @@ class Pet(Base):
     notes = Column(Text, nullable=True)
     archived_at = Column(DateTime, nullable=True, index=True)
     archived_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="pets")
     owner = relationship("Owner", back_populates="pets")

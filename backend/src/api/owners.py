@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -7,6 +6,7 @@ from src.core.database import get_db
 from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
 from src.core.safe_update import safe_update
+from src.core.timezones import utc_now
 from src.models.owner import Owner
 from src.schemas.owner import OwnerCreate, OwnerResponse, OwnerUpdate
 from src.services.audit import audit
@@ -107,7 +107,7 @@ def update_owner(
         action="UPDATE",
         resource="owner",
         resource_id=owner.id,
-        details=updates,
+        details={"fields": sorted(updates)},
         ip_address=request.client.host if request else None,
     )
     return owner
@@ -127,7 +127,7 @@ def delete_owner(
         raise HTTPException(status_code=404, detail="Dono não encontrado")
     if owner.archived_at is not None:
         return {"ok": True, "archived_at": owner.archived_at}
-    archived_at = datetime.now(UTC)
+    archived_at = utc_now()
     owner.archived_at = archived_at
     owner.archived_by_user_id = current_user.id
     for pet in owner.pets:

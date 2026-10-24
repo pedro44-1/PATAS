@@ -114,3 +114,29 @@ def test_owner_blank_optional_fields_are_stored_as_null(client, vet_headers):
     updated = client.patch(f"/api/v1/owners/{data['id']}", headers=vet_headers, json={"email": ""})
     assert updated.status_code == 200
     assert updated.json()["email"] is None
+
+
+def test_owner_nif_and_phone_are_validated_and_normalized(client, vet_headers):
+    personal = client.post("/api/v1/owners/", headers=vet_headers, json={
+        "name": "Ana", "nif": "004 567 890 la 042", "phone": "+244  923 456 789",
+    })
+    assert personal.status_code == 200
+    assert personal.json()["nif"] == "004567890LA042"
+    assert personal.json()["phone"] == "+244 923 456 789"
+
+    company = client.post("/api/v1/owners/", headers=vet_headers, json={"name": "Lda", "nif": "5417-123-456"})
+    assert company.json()["nif"] == "5417123456"
+
+    invalid_nif = client.post("/api/v1/owners/", headers=vet_headers, json={"name": "X", "nif": "12345"})
+    assert invalid_nif.status_code == 422
+    invalid_phone = client.post("/api/v1/owners/", headers=vet_headers, json={"name": "X", "phone": "abc"})
+    assert invalid_phone.status_code == 422
+
+
+def test_owner_update_audit_does_not_copy_personal_data(client, vet_headers, owner, db_session):
+    from src.models.audit_log import AuditLog
+
+    client.patch(f"/api/v1/owners/{owner.id}", headers=vet_headers, json={"phone": "923000111"})
+    entry = db_session.query(AuditLog).filter_by(resource="owner", action="UPDATE").order_by(AuditLog.id.desc()).first()
+    assert "923000111" not in (entry.details or "")
+    assert "phone" in entry.details

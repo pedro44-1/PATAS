@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session, joinedload
@@ -6,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from src.core.database import get_db
 from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
+from src.core.timezones import utc_now
 from src.models.appointment import Appointment
 from src.models.medication import Medication, MedicationStatus
 from src.models.pet import Pet
@@ -228,7 +228,7 @@ def void_vaccination(
 
     record.status = VaccinationStatus.VOIDED
     record.void_reason = reason
-    record.voided_at = datetime.now(UTC)
+    record.voided_at = utc_now()
     record.voided_by = current_user.id
     db.commit()
     db.refresh(record)
@@ -369,7 +369,7 @@ def void_medication(
 
     record.status = MedicationStatus.VOIDED
     record.void_reason = reason
-    record.voided_at = datetime.now(UTC)
+    record.voided_at = utc_now()
     record.voided_by = current_user.id
     db.commit()
     db.refresh(record)

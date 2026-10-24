@@ -5,6 +5,7 @@ import { FormDialog } from "@/components/ui/form-dialog";
 import { PromptDialog } from "@/components/ui/prompt-dialog";
 import { useToast } from "@/contexts/ToastContext";
 import { parseApiDate } from "@/lib/date";
+import { formatKz } from "@/lib/format";
 import { useRemoteOptions } from "@/lib/use-remote-options";
 import { AlertTriangle, Calculator, CheckCircle2, ExternalLink, FileText, Plus, RotateCw, Search, Send, Trash2, X } from "lucide-react";
 
@@ -205,7 +206,7 @@ export default function Invoices() {
     </div>
 
     <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{t("invoices.trainingNotice")}</div>
-    {pendingTotal > 0 && <div className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"><div><p className="text-sm font-semibold text-amber-800">{t("invoices.pendingAlert.label")}</p><p className="text-xs text-amber-600">{t("invoices.pendingAlert.hint", { amount: pendingTotal.toLocaleString("pt-AO"), count: pendingCount })}</p></div><span className="text-lg font-extrabold tabular-nums text-amber-800">{pendingTotal.toLocaleString("pt-AO")} Kz</span></div>}
+    {pendingTotal > 0 && <div className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"><div><p className="text-sm font-semibold text-amber-800">{t("invoices.pendingAlert.label")}</p><p className="text-xs text-amber-600">{t("invoices.pendingAlert.hint", { amount: formatKz(pendingTotal), count: pendingCount })}</p></div><span className="text-lg font-extrabold tabular-nums text-amber-800">{formatKz(pendingTotal)}</span></div>}
     <div className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dark-400" /><Input aria-label={t("invoices.search")} placeholder={t("invoices.search")} value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} className="h-11 rounded-xl bg-white pl-10" /></div>
     {error && <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
@@ -214,7 +215,7 @@ export default function Invoices() {
       <TableBody>{invoices.map((invoice) => <TableRow key={invoice.id}>
         <TableCell className="pl-5 font-bold text-dark-700">{invoice.document_number ?? `#${invoice.id}`}</TableCell>
         <TableCell className="font-medium">{invoice.customer_name ?? owners.find((item) => item.id === invoice.owner_id)?.name ?? "-"}</TableCell>
-        <TableCell className="font-bold tabular-nums"><span>{Number(invoice.quote_payable ?? invoice.amount).toLocaleString("pt-AO")} Kz</span>{invoice.quote_payable != null && <span className="block text-[10px] font-medium text-brand-600">{t("invoices.quote.providerTotal")}</span>}</TableCell>
+        <TableCell className="font-bold tabular-nums"><span>{formatKz(invoice.quote_payable ?? invoice.amount)}</span>{invoice.quote_payable != null && <span className="block text-[10px] font-medium text-brand-600">{t("invoices.quote.providerTotal")}</span>}</TableCell>
         <TableCell><div className="flex flex-wrap items-center gap-1.5"><Badge variant="secondary">{t(`invoices.status.${invoice.status}`)}</Badge>{invoice.sync_status === "failed" && <Badge variant="destructive" title={invoice.last_sync_error ?? undefined}><AlertTriangle className="mr-1 size-3" />{t("invoices.sync.failed")}</Badge>}</div>{invoice.sync_status === "failed" && invoice.last_sync_error && <p className="mt-1 max-w-56 text-[11px] text-destructive">{invoice.last_sync_error}</p>}</TableCell>
         <TableCell className="max-w-52 truncate">{invoice.items?.[0]?.description ?? invoice.description ?? "-"}</TableCell>
         <TableCell className="pr-5"><div className="flex justify-end gap-2">
@@ -241,7 +242,7 @@ export default function Invoices() {
       {emitTarget && <dl className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-3 text-sm">
         <dt className="text-muted-foreground">{t("invoices.table.owner")}</dt><dd className="text-right font-medium">{emitTarget.customer_name ?? "-"}</dd>
         <dt className="text-muted-foreground">{t("invoices.form.documentType")}</dt><dd className="text-right font-medium">{emitTarget.document_type}</dd>
-        <dt className="text-muted-foreground">{t("invoices.quote.providerTotal")}</dt><dd className="text-right font-bold tabular-nums">{Number(emitTarget.quote_payable ?? emitTarget.amount).toLocaleString("pt-AO")} Kz</dd>
+        <dt className="text-muted-foreground">{t("invoices.quote.providerTotal")}</dt><dd className="text-right font-bold tabular-nums">{formatKz(emitTarget.quote_payable ?? emitTarget.amount)}</dd>
       </dl>}
     </ConfirmDialog>
 
@@ -266,7 +267,7 @@ export default function Invoices() {
             <Button type="button" size="icon-sm" variant="ghost" className="mt-6" aria-label={t("invoices.form.removeItem")} disabled={form.items.length === 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))}><Trash2 className="size-4" /></Button>
           </div>)}
         </div>
-        <div className="ml-auto w-full max-w-sm space-y-2 rounded-xl bg-dark-50 p-4 text-sm tabular-nums"><div className="flex justify-between text-lg"><span>{t("invoices.summary.commercialSubtotal")}</span><strong>{subtotal.toLocaleString("pt-AO")} Kz</strong></div><p className="text-xs text-dark-500">{t("invoices.summary.providerTotalHint")}</p></div>
+        <div className="ml-auto w-full max-w-sm space-y-2 rounded-xl bg-dark-50 p-4 text-sm tabular-nums"><div className="flex justify-between text-lg"><span>{t("invoices.summary.commercialSubtotal")}</span><strong>{formatKz(subtotal)}</strong></div><p className="text-xs text-dark-500">{t("invoices.summary.providerTotalHint")}</p></div>
         <div className="flex justify-end gap-3 border-t border-dark-100 pt-4"><Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button><Button type="submit" disabled={saving || !owner?.nif || subtotal < 0}>{saving ? t("invoices.savingDraft") : t("invoices.saveDraft")}</Button></div>
       </form>
     </FormDialog>

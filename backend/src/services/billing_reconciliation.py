@@ -1,8 +1,8 @@
-from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy.orm import Session
 
+from src.core.timezones import utc_now
 from src.models.invoice import Invoice, InvoiceDocumentType, InvoiceStatus
 from src.services.audit import audit
 from src.services.billing import BillingAdapter, get_billing_adapter, is_paid_provider_state
@@ -19,7 +19,7 @@ def reconcile_invoice(
         return None
     adapter = adapter or get_billing_adapter()
     external_status = adapter.get_status(invoice.external_reference)
-    now = datetime.now(UTC)
+    now = utc_now()
     invoice.provider_status = external_status
     invoice.last_sync_at = now
     became_paid = invoice.status == InvoiceStatus.SENT and is_paid_provider_state(external_status)

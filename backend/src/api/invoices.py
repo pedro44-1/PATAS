@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from src.core.database import get_db
 from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
+from src.core.timezones import stored_utc, utc_now
 from src.models.appointment import Appointment, AppointmentStatus
 from src.models.clinic import Clinic
 from src.models.invoice import (
@@ -79,7 +80,7 @@ def _add_line(
 def _recalculate(invoice: Invoice) -> None:
     invoice.subtotal = sum((line.subtotal for line in invoice.lines), Decimal(0))
     invoice.tax_total = sum((line.tax_amount for line in invoice.lines), Decimal(0))
-    invoice.amount = float(_money(invoice.subtotal + invoice.tax_total))
+    invoice.amount = _money(invoice.subtotal + invoice.tax_total)
 
 
 def _find_invoice(db: Session, invoice_id: int, clinic_id: int, *, for_update: bool = False) -> Invoice:
@@ -390,7 +391,7 @@ def preview_invoice(
             detail="Não foi possível contactar o Vendas para calcular a prévia fiscal",
         ) from exc
     invoice.quote_id = result.quote_id
-    invoice.quote_expires_at = result.expires_at
+    invoice.quote_expires_at = stored_utc(result.expires_at) if result.expires_at else None
     invoice.quote_vat_configuration_version = result.vat_configuration_version
     invoice.quote_calculation_digest = result.calculation_digest
     invoice.quote_payable = result.payable
@@ -460,7 +461,7 @@ def sync_invoice(
             ) from exc
         invoice.sync_status = InvoiceSyncStatus.FAILED
         invoice.sync_attempts += 1
-        invoice.last_sync_at = datetime.now(UTC)
+        invoice.last_sync_at = utc_now()
         if _is_definitive_rejection(exc.response.status_code):
             _clear_quote(invoice)
             invoice.last_sync_error = "O software de faturação rejeitou o documento; calcule uma nova prévia"
@@ -471,7 +472,7 @@ def sync_invoice(
     except httpx.HTTPError as exc:
         invoice.sync_status = InvoiceSyncStatus.FAILED
         invoice.sync_attempts += 1
-        invoice.last_sync_at = datetime.now(UTC)
+        invoice.last_sync_at = utc_now()
         invoice.last_sync_error = "O software de faturação não aceitou o pedido"
         db.commit()
         raise HTTPException(status_code=502, detail=invoice.last_sync_error) from exc
@@ -481,11 +482,11 @@ def sync_invoice(
     invoice.series = result.series or invoice.series
     invoice.sync_status = InvoiceSyncStatus.SYNCED
     invoice.sync_attempts += 1
-    invoice.last_sync_at = datetime.now(UTC)
+    invoice.last_sync_at = utc_now()
     invoice.last_sync_error = None
     invoice.provider_status = result.status
     invoice.provider_mode = result.mode
-    invoice.issued_at = datetime.now(UTC)
+    invoice.issued_at = utc_now()
     if invoice.document_type.value == "FR":
         invoice.status = InvoiceStatus.PAID
         invoice.paid_at = invoice.issued_at

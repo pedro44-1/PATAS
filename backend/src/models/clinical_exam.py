@@ -1,10 +1,10 @@
 import enum
-from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class ExamFindingStatus(str, enum.Enum):
@@ -21,7 +21,7 @@ class ClinicalExamSystem(Base):
     name = Column(String(150), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     active = Column(Integer, nullable=False, default=1)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="exam_systems")
     findings = relationship("ClinicalExamFinding", back_populates="system", cascade="all, delete-orphan")
@@ -41,7 +41,7 @@ class ClinicalExamFinding(Base):
     name = Column(String(180), nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     active = Column(Integer, nullable=False, default=1)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="exam_findings")
     system = relationship("ClinicalExamSystem", back_populates="findings")
@@ -63,8 +63,8 @@ class ClinicalExamObservation(Base):
     finding_name = Column(String(180), nullable=False)
     status = Column(String(30), nullable=False, default=ExamFindingStatus.NOT_EVALUATED.value)
     note = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     clinic = relationship("Clinic", back_populates="exam_observations")
     appointment = relationship("Appointment", back_populates="exam_observations")

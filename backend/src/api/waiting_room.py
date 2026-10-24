@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, require_permission
-from src.core.timezones import local_day_bounds, utc_naive
+from src.core.timezones import local_day_bounds, utc_naive, utc_now
 from src.models.appointment import Appointment, AppointmentStatus
 from src.models.owner import Owner
 from src.models.pet import Pet
@@ -202,7 +202,7 @@ def create_waiting_entry(
         appointment_id=appointment.id,
         room=data.room,
         message=data.message,
-        arrival_at=datetime.now(UTC).replace(tzinfo=None),
+        arrival_at=utc_now(),
     )
     db.add(entry)
     try:
