@@ -73,7 +73,7 @@ describe("FormSelect", () => {
     expect(screen.getByRole("option", { name: "Registar novo animal" })).toBeVisible();
     expect(screen.queryByRole("option", { name: "Duke" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("option", { name: "Íris" }));
+    await user.keyboard("{Enter}");
     expect(onValueChange).toHaveBeenCalledWith("íris");
   });
 });

@@ -18,7 +18,7 @@ API modules translate frontend requests/responses to the backend `/api/v1` contr
 - List clients take `PageParams` (`skip`, `limit`, `q`) plus resource filters; read totals with `totalCount` from `pagination.ts`. Use `PAGE_SIZE` for paged tables and `OPTIONS_LIMIT` (200) for selector option lists; resolve a single owner/pet with `get(id)`, never by scanning a list.
 - Preserve the appointment list client's single-date compatibility while serializing agenda intervals as `date_from` and `date_to`.
 - Refresh rotation is single-flight; logout and password change send the refresh token and replace/clear both stored tokens atomically.
-- `apiErrorMessage` prefers a flow-specific status key, then a human-readable backend string `detail` (except for `401`), then the localized status message; never render FastAPI validation arrays or machine codes directly.
+- `apiErrorMessage` prefers a flow-specific status key, then a human-readable backend string `detail` (except for `401`) or a backend-authored validation message (`Value error, …` from our Pydantic validators), then the localized status message; never render raw FastAPI field errors or machine codes.
 - Invoice clients obtain a provider preview before emission; quote metadata comes from the backend and must never be calculated or fabricated in the browser.
 
 ## Work Guidance

@@ -23,8 +23,14 @@ export function apiErrorMessage(
   return String(t(DEFAULT_STATUS_KEYS[status] ?? fallbackKey));
 }
 
+const CUSTOM_VALIDATION_PREFIX = "Value error, ";
+
 function serverDetail(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
   const detail = (data as { detail?: unknown }).detail;
-  return typeof detail === "string" && /\s/.test(detail.trim()) ? detail : null;
+  if (typeof detail === "string") return /\s/.test(detail.trim()) ? detail : null;
+  if (!Array.isArray(detail)) return null;
+  const message = detail.map((item) => (item as { msg?: unknown })?.msg)
+    .find((msg): msg is string => typeof msg === "string" && msg.startsWith(CUSTOM_VALIDATION_PREFIX));
+  return message ? message.slice(CUSTOM_VALIDATION_PREFIX.length) : null;
 }

@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -41,19 +42,26 @@ export function ComboboxSelect({
   onSearchChange,
 }: ComboboxSelectProps) {
   const { t } = useTranslation();
+  const [query, setQuery] = useState("");
   const selected = items.find((item) => item.value === value) ?? null;
+  const orderedItems = useMemo(() => {
+    if (!query.trim()) return items;
+    return [...items.filter((item) => item.variant !== "action"), ...items.filter((item) => item.variant === "action")];
+  }, [items, query]);
 
   return (
     <Combobox.Root<ComboboxSelectItem>
-      items={items}
+      items={orderedItems}
       value={selected}
       onValueChange={(item) => {
         if (item) onValueChange(item.value);
       }}
       isItemEqualToValue={(item, current) => item.value === current.value}
       filter={(item, query) => item.variant === "action" || normalize(item.label).includes(normalize(query))}
-      onInputValueChange={(query, details) => {
-        if (details.reason === "input-change" || details.reason === "input-clear") onSearchChange?.(query);
+      onInputValueChange={(nextQuery, details) => {
+        if (details.reason !== "input-change" && details.reason !== "input-clear") return;
+        setQuery(nextQuery);
+        onSearchChange?.(nextQuery);
       }}
       autoHighlight
       disabled={disabled}

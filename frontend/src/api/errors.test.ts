@@ -67,4 +67,24 @@ describe("apiErrorMessage", () => {
     expect(apiErrorMessage(coded, translate, "fallback")).toBe("apiErrors.forbidden");
     expect(apiErrorMessage(expired, translate, "fallback")).toBe("apiErrors.sessionExpired");
   });
+
+  it("shows backend-authored validation messages but hides raw field errors", () => {
+    const custom = new axios.AxiosError("request failed", undefined, undefined, undefined, {
+      status: 422,
+      statusText: "",
+      headers: {},
+      config: { headers: {} } as never,
+      data: { detail: [{ type: "value_error", msg: "Value error, NIF inválido: use 10 dígitos" }] },
+    });
+    const raw = new axios.AxiosError("request failed", undefined, undefined, undefined, {
+      status: 422,
+      statusText: "",
+      headers: {},
+      config: { headers: {} } as never,
+      data: { detail: [{ type: "value_error", msg: "value is not a valid email address" }] },
+    });
+
+    expect(apiErrorMessage(custom, translate, "fallback")).toBe("NIF inválido: use 10 dígitos");
+    expect(apiErrorMessage(raw, translate, "fallback")).toBe("apiErrors.validation");
+  });
 });

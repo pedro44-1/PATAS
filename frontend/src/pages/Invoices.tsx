@@ -148,15 +148,13 @@ export default function Invoices() {
 
   async function runRowAction(id: number, action: () => Promise<unknown>, errorKey = "invoices.error") {
     setBusyId(id);
-    setError("");
     try {
       await action();
-      load();
     } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, errorKey));
-      load();
+      toast.error(apiErrorMessage(requestError, t, errorKey));
     } finally {
       setBusyId(null);
+      load();
     }
   }
 
@@ -200,7 +198,7 @@ export default function Invoices() {
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div><h2 className="text-2xl font-extrabold text-dark-900">{t("invoices.title")}</h2><p className="mt-0.5 text-sm text-dark-400">{t("invoices.count", { count: total })}</p></div>
       <div className="flex items-center gap-3">
-        <FormSelect value={filterStatus} onValueChange={setFilterStatus} options={["", "draft", "sent", "paid", "cancelled"].map((value) => ({ value, label: t(`invoices.filter.${value || "all"}`) }))} className="min-w-36" />
+        <FormSelect ariaLabel={t("invoices.table.status")} value={filterStatus} onValueChange={(value) => { setFilterStatus(value); setPage(0); }} options={["", "draft", "sent", "paid", "cancelled"].map((value) => ({ value, label: t(`invoices.filter.${value || "all"}`) }))} className="min-w-36" />
         <Button onClick={openCreate}><Plus className="mr-2 size-4" />{t("invoices.new")}</Button>
       </div>
     </div>
@@ -251,7 +249,7 @@ export default function Invoices() {
         <FormError message={formError} />
         <div className="grid gap-4 md:grid-cols-4">
           <div className="space-y-1.5 md:col-span-2"><Label htmlFor="invoice-owner">{t("invoices.form.owner")} *</Label><FormSelect id="invoice-owner" ariaLabel={t("invoices.form.owner")} value={form.owner_id || null} onValueChange={(value) => { setNifDraft(""); setForm((current) => ({ ...current, owner_id: Number(value), appointment_id: null })); }} onSearchChange={ownerSearch.onSearchChange} options={ownerOptions.map((item) => ({ value: item.id, label: item.nif ? `${item.name} · ${item.nif}` : item.name }))} placeholder={t("invoices.form.selectOwner")} required /></div>
-          <div className="space-y-1.5"><Label htmlFor="invoice-appointment">{t("invoices.form.appointment")}</Label><FormSelect id="invoice-appointment" ariaLabel={t("invoices.form.appointment")} value={form.appointment_id} onValueChange={(value) => setForm((current) => ({ ...current, appointment_id: value ? Number(value) : null }))} options={[{ value: "", label: t("invoices.form.noAppointment") }, ...ownerAppointments.map((item) => ({ value: item.id, label: `${parseApiDate(item.scheduled_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" })} · ${item.pet_name ?? ""} · ${item.reason || t("appointments.title")}` }))]} /></div>
+          <div className="space-y-1.5"><Label htmlFor="invoice-appointment">{t("invoices.form.appointment")}</Label><FormSelect id="invoice-appointment" ariaLabel={t("invoices.form.appointment")} value={form.appointment_id} onValueChange={(value) => setForm((current) => ({ ...current, appointment_id: value ? Number(value) : null }))} options={[{ value: "", label: t("invoices.form.noAppointment") }, ...ownerAppointments.map((item) => ({ value: item.id, label: [parseApiDate(item.scheduled_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" }), item.pet_name, item.reason].filter(Boolean).join(" · ") }))]} /></div>
           <div className="space-y-1.5"><Label htmlFor="invoice-document-type">{t("invoices.form.documentType")}</Label><FormSelect id="invoice-document-type" ariaLabel={t("invoices.form.documentType")} value={form.document_type} onValueChange={(value) => setForm((current) => ({ ...current, document_type: value as "FT" | "FR" }))} options={[{ value: "FT", label: t("invoices.documentType.FT") }, { value: "FR", label: t("invoices.documentType.FR") }]} /></div>
           {form.document_type === "FR" && <div className="space-y-1.5"><Label htmlFor="invoice-payment-method">{t("invoices.form.paymentMethod")}</Label><FormSelect id="invoice-payment-method" ariaLabel={t("invoices.form.paymentMethod")} value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as PaymentMethod }))} options={(["cash", "bank-transfer", "tpa"] as PaymentMethod[]).map((value) => ({ value, label: t(`invoices.paymentMethod.${value}`) }))} />{form.payment_method === "cash" && <p className="text-xs text-amber-700">{t("invoices.form.cashSessionHint")}</p>}</div>}
         </div>
@@ -259,11 +257,11 @@ export default function Invoices() {
         <div className="space-y-3">
           <div className="flex items-center justify-between"><div><h3 className="font-bold text-dark-900">{t("invoices.form.items")}</h3><p className="text-xs text-dark-400">{t("invoices.form.itemsHint")}</p></div><Button type="button" size="sm" variant="outline" onClick={() => setForm((current) => ({ ...current, items: [...current.items, emptyLine()] }))}><Plus className="mr-1 size-3.5" />{t("invoices.form.addItem")}</Button></div>
           {form.items.map((item, index) => <div key={index} className="grid gap-3 rounded-xl border border-dark-100 bg-dark-50/50 p-4 md:grid-cols-2 lg:grid-cols-[110px_minmax(0,2fr)_80px_120px_140px_40px]">
-            <div className="space-y-1"><Label>{t("invoices.form.kind")}</Label><FormSelect value={item.kind} onValueChange={(value) => updateLine(index, { kind: value as "SERVICE" | "PRODUCT" })} options={[{ value: "SERVICE", label: t("invoices.lineKind.SERVICE") }, { value: "PRODUCT", label: t("invoices.lineKind.PRODUCT") }]} /></div>
-            <div className="space-y-1"><Label>{t("invoices.form.description")}</Label><Input value={item.description} onChange={(event) => updateLine(index, { description: event.target.value })} required /></div>
-            <div className="space-y-1"><Label>{t("invoices.form.quantity")}</Label><Input type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })} required /></div>
-            <div className="space-y-1"><Label>{t("invoices.form.unitPrice")}</Label><Input type="number" min="0" step="0.01" value={item.unit_price || ""} onChange={(event) => updateLine(index, { unit_price: Number(event.target.value) })} required /></div>
-            <div className="space-y-1"><Label>{t("invoices.form.vatProfile")}</Label><Input value={item.vat_profile_code ?? ""} onChange={(event) => updateLine(index, { vat_profile_code: event.target.value || undefined })} placeholder={t("invoices.form.vatProfileDefault")} /></div>
+            <div className="space-y-1"><Label htmlFor={`invoice-line-${index}-kind`}>{t("invoices.form.kind")}</Label><FormSelect id={`invoice-line-${index}-kind`} ariaLabel={t("invoices.form.kind")} value={item.kind} onValueChange={(value) => updateLine(index, { kind: value as "SERVICE" | "PRODUCT" })} options={[{ value: "SERVICE", label: t("invoices.lineKind.SERVICE") }, { value: "PRODUCT", label: t("invoices.lineKind.PRODUCT") }]} /></div>
+            <div className="space-y-1"><Label htmlFor={`invoice-line-${index}-description`}>{t("invoices.form.description")}</Label><Input id={`invoice-line-${index}-description`} value={item.description} onChange={(event) => updateLine(index, { description: event.target.value })} required /></div>
+            <div className="space-y-1"><Label htmlFor={`invoice-line-${index}-quantity`}>{t("invoices.form.quantity")}</Label><Input id={`invoice-line-${index}-quantity`} type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })} required /></div>
+            <div className="space-y-1"><Label htmlFor={`invoice-line-${index}-unit-price`}>{t("invoices.form.unitPrice")}</Label><Input id={`invoice-line-${index}-unit-price`} type="number" min="0" step="0.01" value={item.unit_price || ""} onChange={(event) => updateLine(index, { unit_price: Number(event.target.value) })} required /></div>
+            <div className="space-y-1"><Label htmlFor={`invoice-line-${index}-vat-profile`}>{t("invoices.form.vatProfile")}</Label><Input id={`invoice-line-${index}-vat-profile`} value={item.vat_profile_code ?? ""} onChange={(event) => updateLine(index, { vat_profile_code: event.target.value || undefined })} placeholder={t("invoices.form.vatProfileDefault")} /></div>
             <Button type="button" size="icon-sm" variant="ghost" className="mt-6" aria-label={t("invoices.form.removeItem")} disabled={form.items.length === 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))}><Trash2 className="size-4" /></Button>
           </div>)}
         </div>
