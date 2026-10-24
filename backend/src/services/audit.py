@@ -1,14 +1,15 @@
-﻿import json
-from datetime import datetime, timezone
+import json
+
 from sqlalchemy.orm import Session
 
+from src.core.timezones import utc_now
 from src.models.audit_log import AuditLog
 
 
 def audit(
     db: Session,
     clinic_id: int,
-    user_id: int,
+    user_id: int | None,
     action: str,
     resource: str,
     resource_id: int | None = None,
@@ -23,7 +24,7 @@ def audit(
         resource_id=resource_id,
         details=json.dumps(details, default=str) if details else None,
         ip_address=ip_address,
-        created_at=datetime.now(timezone.utc),
+        created_at=utc_now(),
     )
     db.add(entry)
     db.commit()

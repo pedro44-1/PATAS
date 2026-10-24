@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python 3.11+
-- Node.js 18+
+- Node.js 20.19+
 - Docker & Docker Compose (optional, for full stack)
 
 ## Backend Setup
@@ -22,6 +22,7 @@ pip install -r requirements.txt
 **Development (SQLite, no install):**
 
 ```powershell
+$env:DATABASE_URL='sqlite:///./patas_dev.db'
 alembic upgrade head
 ```
 
@@ -46,15 +47,42 @@ This runs automatically on app startup but can be run manually.
 python -m scripts.seed_demo
 ```
 
-Creates: 1 clinic, 2 users, 3 owners, 5 pets, 5 appointments, 2 invoices.
+Cria um conjunto sintético de clínica, equipa, donos, animais, consultas e faturas para desenvolvimento local.
 
 ### 5. Run
 
 ```powershell
-uvicorn app.main:app --reload
+uvicorn src.main:app --reload
 ```
 
 API: `http://localhost:8000` — OpenAPI docs: `http://localhost:8000/docs`
+
+### WhatsApp Cloud API (optional)
+
+The integration is disabled by default. To enable the adapter and webhook, define:
+
+```dotenv
+WHATSAPP_ENABLED=true
+WHATSAPP_GRAPH_API_VERSION=<current-supported-version>
+WHATSAPP_PHONE_NUMBER_ID=<meta-phone-number-id>
+WHATSAPP_ACCESS_TOKEN=<system-user-access-token>
+WHATSAPP_APP_SECRET=<meta-app-secret>
+WHATSAPP_VERIFY_TOKEN=<random-private-verification-token>
+WHATSAPP_REQUEST_TIMEOUT_SECONDS=10
+```
+
+Use the current supported Graph API version from Meta instead of pinning a version in source.
+Configure the Meta webhook callback as:
+
+```text
+https://<public-patas-host>/api/v1/integrations/whatsapp/webhook
+```
+
+Subscribe the WhatsApp Business Account to message events. The callback validates both the
+verification token and `X-Hub-Signature-256`. Keep all secrets outside the repository. The
+current inbound handler acknowledges and counts events but does not persist messages or trigger
+clinic workflows. Outbound text and template delivery is available through the internal
+`WhatsAppService` adapter for a future, explicitly authorized notification workflow.
 
 ## Frontend Setup
 
@@ -66,30 +94,36 @@ npm run dev
 
 Dashboard: `http://localhost:3000`
 
-The frontend expects the API at `http://localhost:80` (via nginx in Docker) or
-set `VITE_API_URL` env var for standalone development.
+O frontend usa `/api/v1` no mesmo host. O servidor Vite já encaminha `/api` para `http://localhost:8000`; no Compose, SPA e API são servidas pela porta 80.
 
-## Docker Compose (Full Stack)
+## Docker Compose (piloto LAN)
 
 ```powershell
-docker compose up -d --build
+Copy-Item infra/.env.example infra/.env
+# Substitua todos os segredos em infra/.env antes de continuar.
+docker compose -f infra/docker-compose.yml --env-file infra/.env config --quiet
+docker compose -f infra/docker-compose.yml --env-file infra/.env up -d --build
+Invoke-WebRequest http://localhost/health -UseBasicParsing
 ```
 
 | Service | Internal Port | External Port |
 |---|---|---|
 | backend | 8000 | — |
-| frontend | 5173 | — |
-| db (Postgres) | 5432 | 5432 |
-| redis | 6379 | 6379 |
-| nginx-lb | 80 / 443 | 80 / 443 |
+| frontend | 80 | — |
+| db (Postgres) | 5432 | — |
+| redis | 6379 | — |
+| nginx | 80 | 80 |
+
+O serviço one-shot `migrate` executa `alembic upgrade head`; uma falha impede o arranque do backend. Este perfil é exclusivamente HTTP em rede privada. Consulte `docs/operacao-piloto.md` para instalação, atualização, backup e restauro.
 
 ## Docker Compose (Integration Tests)
 
 ```powershell
 docker compose -f docker-compose.test.yml -p patas-test up -d --build
 $env:BASE_URL = "http://localhost:8001"
+$env:POSTGRES_ADMIN_URL = "postgresql://patas:patas_test_password@localhost:5433/postgres"
 cd backend
-pytest -m integration
+python -m pytest tests/test_integration.py tests/test_postgres_migrations.py -m integration
 # Clean up:
 docker compose -f docker-compose.test.yml -p patas-test down --volumes
 ```
@@ -104,8 +138,11 @@ scripts/run_integration_tests.ps1
 
 | Command | What it runs |
 |---|---|
-| `pytest tests/` | 60 unit tests (SQLite, fast, default) |
-| `pytest -m integration` | 9 integration tests (TestClient mode) |
+| `$env:PYTHONPATH='.'; pytest tests/ -q` | Suite rápida SQLite |
+| `scripts/run_integration_tests.ps1` | API real PostgreSQL/Redis, concorrência e migrações |
+| `ruff check src/` (em `backend`) | Lint apenas verificativo |
+| `npm run test --workspace=frontend` | Guards, sessão, perfis e datas de Luanda |
+| `npm run build` | Tipos partilhados e build frontend |
 | `pytest tests/ -v` | Verbose, shows test names |
 | `pytest tests/ --tb=long` | Full traceback on failure |
 
@@ -124,11 +161,11 @@ alembic upgrade head --sql        # Preview SQL (offline mode)
 
 ### Add a new model
 
-1. Create model in `backend/app/models/`
-2. Import it in `backend/app/models/__init__.py`
-3. Create Pydantic schemas in `backend/app/schemas/`
-4. Create router in `backend/app/api/v1/`
-5. Wire router in `backend/app/api/v1/__init__.py`
+1. Create model in `backend/src/models/`
+2. Import it in `backend/src/models/__init__.py`
+3. Create Pydantic schemas in `backend/src/schemas/`
+4. Create router in `backend/src/api/`
+5. Wire router in `backend/src/api/__init__.py`
 6. Run `alembic revision --autogenerate -m "add_my_model"`
 7. Review and apply `alembic upgrade head`
 8. Add fixtures to `backend/tests/conftest.py`
@@ -143,7 +180,7 @@ alembic upgrade head --sql        # Preview SQL (offline mode)
 ### Add a new API endpoint
 
 1. Add route function to existing router or create new router file
-2. Wire in `backend/app/api/v1/__init__.py`
+2. Wire in `backend/src/api/__init__.py`
 3. Add audit logging for mutations
 4. Add clinic scoping
 5. Add pagination for list endpoints

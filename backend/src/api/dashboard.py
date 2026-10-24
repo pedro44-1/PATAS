@@ -1,10 +1,12 @@
-﻿from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from datetime import datetime, timezone, timedelta
+﻿from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, get_current_user
+from src.core.timezones import local_day_bounds
 from src.models.appointment import Appointment, AppointmentStatus
 from src.models.owner import Owner
 from src.models.pet import Pet
@@ -14,6 +16,7 @@ router = APIRouter()
 
 class StatusCount(BaseModel):
     scheduled: int = 0
+    in_progress: int = 0
     completed: int = 0
     cancelled: int = 0
     no_show: int = 0
@@ -33,9 +36,8 @@ def dashboard(
     db: Session = Depends(get_db),
 ):
     clinic_id = current_user.clinic_id
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    today_start, today_end = local_day_bounds(None)
 
     today_appts = db.query(Appointment).filter(
         Appointment.clinic_id == clinic_id,
@@ -49,6 +51,8 @@ def dashboard(
             status_count.scheduled += 1
         elif a.status == AppointmentStatus.COMPLETED:
             status_count.completed += 1
+        elif a.status == AppointmentStatus.IN_PROGRESS:
+            status_count.in_progress += 1
         elif a.status == AppointmentStatus.CANCELLED:
             status_count.cancelled += 1
         elif a.status == AppointmentStatus.NO_SHOW:
@@ -57,11 +61,11 @@ def dashboard(
     upcoming = db.query(Appointment).filter(
         Appointment.clinic_id == clinic_id,
         Appointment.scheduled_at >= now,
-        Appointment.status == AppointmentStatus.SCHEDULED,
+        Appointment.status.in_([AppointmentStatus.SCHEDULED, AppointmentStatus.IN_PROGRESS]),
     ).order_by(Appointment.scheduled_at).limit(10).all()
 
-    total_owners = db.query(Owner).filter(Owner.clinic_id == clinic_id).count()
-    total_pets = db.query(Pet).filter(Pet.clinic_id == clinic_id).count()
+    total_owners = db.query(Owner).filter(Owner.clinic_id == clinic_id, Owner.archived_at.is_(None)).count()
+    total_pets = db.query(Pet).filter(Pet.clinic_id == clinic_id, Pet.archived_at.is_(None)).count()
 
     return DashboardResponse(
         today_appointments_total=len(today_appts),

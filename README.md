@@ -1,189 +1,75 @@
-vet clinic management, concurrency(locked)
-  clinic-scoped queries
-  cache (redis)
-  audit logs
-  json logs
 # PATAS
 
-Veterinary clinic management SaaS for the Angolan market (Luanda/Benguela focus).
+SaaS de gestão clínica veterinária para Angola, com interface portuguesa e operação funcional em `Africa/Luanda`.
 
-## Status
+## MVP
 
-**v0.1.0** — Phase 1 backend complete. 69 tests (60 unit + 9 integration), all passing.
+O percurso coberto inclui:
 
-## Quick Start
+- registo de clínica, administrador e equipa com palavra-passe temporária;
+- isolamento por clínica e perfis `admin`, `vet` e `receptionist`;
+- donos e animais com arquivo lógico e histórico preservado;
+- agenda sem sobreposição, sala de espera e ciclo clínico transacional;
+- exame estruturado, tratamentos, vacinas e medicação;
+- faturação local com adaptador mock, sem pagamentos reais;
+- dashboard com dados da clínica e frontend português-first.
 
-### Backend (dev, SQLite)
+Os requisitos e respetivos testes estão em [requisitos funcionais](docs/requisitos-funcionais.md) e na [matriz de rastreabilidade](docs/matriz-rastreabilidade.md).
+
+## Desenvolvimento
+
+Backend:
 
 ```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+$env:DATABASE_URL='sqlite:///./patas_dev.db'
 alembic upgrade head
-python -m scripts.seed_demo
-uvicorn app.main:app --reload
+uvicorn src.main:app --reload
 ```
 
-API at `http://localhost:8000` — docs at `http://localhost:8000/docs`
-
-### Frontend
+Frontend, noutro terminal:
 
 ```powershell
-cd frontend
 npm install
-npm run dev
+npm run dev --workspace=frontend
 ```
 
-Dashboard at `http://localhost:3000`
+O Vite abre em `http://localhost:3000` e encaminha `/api` para o backend em `http://localhost:8000`.
 
-### Docker Compose (full stack)
+## Piloto LAN
 
 ```powershell
-docker compose up -d --build
+Copy-Item infra/.env.example infra/.env
+# Defina segredos fortes em infra/.env.
+docker compose -f infra/docker-compose.yml --env-file infra/.env up -d --build
+Invoke-WebRequest http://localhost/health -UseBasicParsing
 ```
 
-Services:
-| Service | Port |
-|---|---|
-| Backend | 8000 |
-| Frontend | 3000 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| Nginx | 80 / 443 |
+O perfil do piloto publica apenas HTTP/80. A migração Alembic é um serviço one-shot e o backend só arranca após o seu sucesso. Consulte o [runbook do piloto](docs/operacao-piloto.md) antes de usar dados reais; backup PostgreSQL e ensaio de restauro são obrigatórios.
 
-### Running Tests
+## Verificação
 
 ```powershell
 cd backend
-pytest tests/                      # 60 unit tests
-pytest -m integration              # 9 integration tests (TestClient mode)
-# or against Docker:
-scripts/run_integration_tests.ps1  # spins up Docker stack, runs tests, tears down
+$env:PYTHONPATH='.'
+pytest tests/ -q
+ruff check src/
+
+cd ..
+npm run test --workspace=frontend
+npm run build
+scripts/run_integration_tests.ps1
 ```
 
-## Tech Stack
+O runner de integração usa PostgreSQL e Redis reais, valida migrações de base vazia e anterior, o percurso vertical e a concorrência de agenda. A CI acrescenta o smoke test do Compose LAN.
 
-| Layer | Tech |
-|---|---|
-| Backend | Python 3.11, FastAPI, SQLAlchemy 2.0, Pydantic v2, Alembic |
-| Database | PostgreSQL (prod) / SQLite (tests) |
-| Cache | Redis (rate limiting, token blacklist) |
-| Auth | JWT (access + refresh), bcrypt, role-based permissions |
-| Frontend | React 18, TypeScript, Vite, Tailwind, shadcn/ui |
-| Infrastructure | Docker Compose, nginx, certbot |
+## Arquitetura
 
-## Architecture
+- Backend: Python 3.11, FastAPI, SQLAlchemy 2, Pydantic 2, Alembic, PostgreSQL e Redis.
+- Frontend: React 18, TypeScript, Vite, Tailwind e tipos de `@patas/shared-types`.
+- Infraestrutura: Docker Compose e nginx; `/api/v1` e a SPA partilham o mesmo host.
 
-```
-frontend/              React SPA
-backend/
-  app/
-    core/              Config, security, DB, deps, logging
-    models/            SQLAlchemy models (clinic-scoped FKs)
-    schemas/           Pydantic validation schemas
-    api/v1/            REST routers (auth, owners, pets, appointments, treatments, invoices, users, dashboard)
-    services/          Cache, audit log
-  scripts/             seed_permissions, seed_demo, test_migrations
-  tests/               60 unit + 9 integration tests
-  alembic/             Migration chain (4 migrations)
-docker-compose.yml     Dev stack (Postgres + Redis + backend + frontend + nginx + certbot)
-docker-compose.test.yml CI stack (Postgres + Redis + backend on port 8001)
-```
-
-## Security
-
-- JWT access tokens (60 min) + refresh tokens (7 days, rotation + blacklist)
-- Role-based access with fine-grained permissions (12 permissions × 3 roles)
-- Rate limiting: 100 req/min per IP globally, 5 req/60s per IP on `/auth/login`
-- CORS whitelist, request body size limit (5 MB)
-- Password policy (8+ chars, uppercase, digit)
-- Cross-tenant isolation via `clinic_id` scoping on all queries
-- Audit logging on all mutations (CREATE, UPDATE, DELETE, LOGIN, FORBIDDEN)
-
-## Multi-Tenant Design
-
-- Shared schema with `clinic_id` foreign key on every table
-- Register creates a new clinic + admin user
-- All queries scoped by `clinic_id` from JWT
-- Cross-tenant access returns 404 (resource doesn't exist from tenant's view)
-
-## Roles & Permissions
-
-| Permission | Admin | Vet | Receptionist |
-|---|---|---|---|
-| owner:read/write | ✓ | ✓ | ✓ |
-| pet:read/write | ✓ | ✓ | ✓ |
-| appointment:read/write | ✓ | ✓ | ✓ |
-| treatment:read | ✓ | ✓ | ✓ |
-| treatment:write | ✓ | ✓ | ✗ |
-| invoice:read | ✓ | ✓ | ✓ |
-| invoice:write | ✓ | ✓ | ✗ |
-| user:read/write | ✓ | ✗ | ✗ |
-
-## API Overview
-
-| Endpoint | Description |
-|---|---|
-| `POST /api/v1/auth/register` | Register new clinic + admin |
-| `POST /api/v1/auth/login` | Login, get tokens |
-| `POST /api/v1/auth/refresh` | Rotate refresh token |
-| `GET /api/v1/auth/me` | Current user info |
-| `POST /api/v1/auth/logout` | Blacklist access token |
-| `GET /api/v1/dashboard/` | Today's appointments, counts |
-| `CRUD /api/v1/owners/` | Pet owners |
-| `CRUD /api/v1/pets/` | Pets |
-| `CRUD /api/v1/appointments/` | Appointments |
-| `CRUD /api/v1/treatments/` | Treatments (vet-only write) |
-| `CRUD /api/v1/invoices/` | Invoices (vet-only write) |
-| `GET/PATCH /api/v1/users/` | User management (admin only) |
-| `GET /health` | DB + Redis health check |
-
-All list endpoints support `?skip=N&limit=N` pagination with `X-Total-Count` header.
-Owners support `?q=term` search; invoices support `?owner_id=&status=` filters.
-
-## Migrations
-
-```powershell
-alembic upgrade head        # Apply all migrations
-alembic downgrade -1        # Roll back one step
-alembic revision --autogenerate -m "description"  # Generate from model changes
-```
-
-Current migration chain:
-1. `0901f80563e4` — initial schema
-2. `7a3e10b4c9d5` — permissions + role_permissions
-3. `e030bf513d7f` — indexes on FKs
-4. `d5eaf1a2baa6` — invoice.reason + no-show status
-
-## Demo Credentials
-
-After running `python -m scripts.seed_demo`:
-- **Vet:** `vet@patas.ao` / `Password1`
-- **Receptionist:** `receptionist@patas.ao` / `Password1`
-
-## Environment Variables
-
-| Variable | Default | Production |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://...` | Required |
-| `SECRET_KEY` | dev key | Required (32+ chars) |
-| `ENCRYPTION_KEY` | dev key | Required (32+ chars) |
-| `REDIS_URL` | `redis://redis:6379/0` | Required |
-| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Your domain |
-| `APP_ENV` | `development` | `production` |
-| `POSTGRES_PASSWORD` | `patas_dev_password` | Strong password |
-
-## Deployment
-
-See AGENTS.md for full deployment checklist. Key steps:
-1. Set `APP_ENV=production` and strong `SECRET_KEY` / `ENCRYPTION_KEY`
-2. Configure domain DNS, set CORS origins
-3. Run `docker compose up -d --build`
-4. Initial SSL: `docker compose run --rm certbot certonly --webroot -w /var/www/certbot -d yourdomain.com`
-
-## Docs
-
-- `AGENTS.md` — agent operations manual
-- `docs/setup.md` — developer setup guide
-- `docs/api.md` — API usage examples
+Mais detalhes: [setup](docs/setup.md), [API](docs/api.md) e [operação](docs/operacao-piloto.md).

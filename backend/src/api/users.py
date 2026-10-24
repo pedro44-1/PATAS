@@ -1,21 +1,56 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Request, Response
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
 from src.core.database import get_db
-from src.core.deps import CurrentUser, get_current_user, require_permission
+from src.core.deps import CurrentUser, require_permission
+from src.core.pagination import Limit, Skip
+from src.core.security import hash_password
 from src.models.user import User
-from src.schemas.user import UserResponse, UserRoleUpdate
+from src.schemas.user import UserCreate, UserResponse, UserRoleUpdate, UserStatusUpdate
 from src.services.audit import audit
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.post("/", response_model=UserResponse, status_code=201)
+def create_user(
+    data: UserCreate,
+    current_user: CurrentUser = Depends(require_permission("user:write")),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=400, detail="Email já registado")
+    user = User(
+        clinic_id=current_user.clinic_id,
+        name=data.name,
+        email=data.email,
+        password_hash=hash_password(data.password),
+        role=data.role,
+        must_change_password=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    audit(
+        db,
+        clinic_id=current_user.clinic_id,
+        user_id=current_user.id,
+        action="CREATE",
+        resource="user",
+        resource_id=user.id,
+        details={"email": user.email, "role": user.role.value, "temporary_password": True},
+        ip_address=request.client.host if request else None,
+    )
+    return user
+
+
+@router.get("/", response_model=list[UserResponse])
 def list_users(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     current_user: CurrentUser = Depends(require_permission("user:read")),
     db: Session = Depends(get_db),
 ):
@@ -36,14 +71,14 @@ def update_user_role(
 ):
     if user_id == current_user.id:
         raise HTTPException(
-            status_code=400, detail="NГЈo pode alterar a sua prГіpria funГ§ГЈo"
+            status_code=400, detail="Não pode alterar a sua própria função"
         )
 
     user = db.query(User).filter(
         User.id == user_id, User.clinic_id == current_user.clinic_id
     ).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Utilizador nГЈo encontrado")
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
 
     old_role = user.role
     user.role = data.role
@@ -60,4 +95,37 @@ def update_user_role(
         details={"old_role": old_role.value, "new_role": user.role.value},
         ip_address=request.client.host if request else None,
     )
+    return user
+
+
+@router.patch("/{user_id}/status", response_model=UserResponse)
+def update_user_status(
+    user_id: int,
+    data: UserStatusUpdate,
+    current_user: CurrentUser = Depends(require_permission("user:write")),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não pode desativar a sua própria conta")
+    user = db.query(User).filter(
+        User.id == user_id, User.clinic_id == current_user.clinic_id
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
+    if user.is_active != data.is_active:
+        user.is_active = data.is_active
+        user.token_version = (user.token_version or 0) + 1
+        db.commit()
+        db.refresh(user)
+        audit(
+            db,
+            clinic_id=current_user.clinic_id,
+            user_id=current_user.id,
+            action="UPDATE",
+            resource="user",
+            resource_id=user.id,
+            details={"is_active": user.is_active},
+            ip_address=request.client.host if request else None,
+        )
     return user

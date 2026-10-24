@@ -1,8 +1,9 @@
-﻿from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Date, ForeignKey
+
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
 
 from src.core.database import Base
+from src.core.timezones import utc_now
 
 
 class Pet(Base):
@@ -13,12 +14,20 @@ class Pet(Base):
     owner_id = Column(Integer, ForeignKey("owners.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     species = Column(String(100), nullable=False)
-    breed = Column(String(255), nullable=True)
+    breed = Column(String(100), nullable=True)
     birth_date = Column(Date, nullable=True)
-    weight = Column(Float, nullable=True)  # kg вЂ” latest recorded weight
+    weight = Column(Numeric(8, 2), nullable=True)  # kg — latest recorded weight
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    archived_at = Column(DateTime, nullable=True, index=True)
+    archived_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=utc_now)
 
     clinic = relationship("Clinic", back_populates="pets")
     owner = relationship("Owner", back_populates="pets")
     appointments = relationship("Appointment", back_populates="pet")
+    vaccinations = relationship("Vaccination", back_populates="pet")
+    medications = relationship("Medication", back_populates="pet")
+
+    @property
+    def owner_name(self) -> str | None:
+        return self.owner.name if self.owner else None

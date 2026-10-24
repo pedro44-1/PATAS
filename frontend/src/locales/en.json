@@ -4,14 +4,737 @@
     "tagline": "Veterinary Clinic"
   },
   "nav": {
+    "main": "Operations",
+    "system": "System",
     "dashboard": "Dashboard",
+    "waitingRoom": "Waiting room",
+    "clinicalAppointment": "Clinical encounter",
     "appointments": "Appointments",
     "owners": "Owners",
     "pets": "Pets",
     "treatments": "Treatments",
     "invoices": "Invoices",
     "settings": "Settings",
+    "users": "Users",
     "logout": "Sign out"
+  },
+  "auth": {
+    "login": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "loginButton": "Sign in",
+    "loggingIn": "Signing in...",
+    "loginError": "Incorrect email or password",
+    "demoUsers": "Demo users",
+    "welcome": "Welcome back",
+    "accessHint": "Access your clinic management workspace.",
+    "demoHint": "Quick demo access",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "secureAccess": "Secure access for your team",
+    "location": "PATAS · Luanda, Angola",
+    "noClinic": "Do not have a clinic yet?",
+    "registerClinic": "Create clinic",
+    "registerTitle": "Create your clinic",
+    "registerHint": "Register the clinic and its first administrator account.",
+    "registerError": "The clinic could not be created.",
+    "clinicName": "Clinic name",
+    "clinicNif": "Clinic tax ID",
+    "adminName": "Administrator name",
+    "passwordRules": "At least 8 characters, with one uppercase letter and one number.",
+    "createClinic": "Create clinic",
+    "backToLogin": "Back to sign in",
+    "passwordChangeTitle": "Set your password",
+    "passwordChangeHint": "This account uses a temporary password. Change it to continue.",
+    "currentPassword": "Temporary password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "passwordMismatch": "The new passwords do not match.",
+    "passwordChangeError": "The password could not be changed.",
+    "changePassword": "Change password",
+    "logoutInstead": "Sign out"
+  },
+  "apiErrors": {
+    "sessionExpired": "Your session has expired. Sign in again.",
+    "forbidden": "You do not have permission to perform this action.",
+    "conflict": "The action conflicts with the current state. Refresh the data and try again.",
+    "validation": "Some data is invalid or missing. Review the form."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "upcoming": "Upcoming appointments",
+    "noUpcoming": "No appointments scheduled",
+    "viewAll": "View all",
+    "schedule": "Schedule a new appointment",
+    "todayAppointments": "Today's appointments",
+    "defaultReason": "Appointment",
+    "cards": {
+      "pets": "Registered animals",
+      "owners": "Owners",
+      "today": "Appointments today",
+      "upcoming": "Upcoming appointments"
+    },
+    "quickActions": {
+      "title": "Quick actions",
+      "appointment": "Schedule appointment",
+      "pet": "Register animal",
+      "owner": "Add owner",
+      "invoice": "Create invoice"
+    },
+    "summary": {
+      "title": "Daily summary",
+      "count_one": "{{count}} appointment",
+      "count_other": "{{count}} appointments"
+    },
+    "stats": {
+      "pets": "Animals",
+      "owners": "Owners",
+      "appointments": "Appointments",
+      "treatments": "Treatments"
+    },
+    "loadError": "Could not load the dashboard."
+  },
+  "appointments": {
+    "title": "Appointments",
+    "new": "New appointment",
+    "edit": "Edit appointment",
+    "noResults": "No appointments for this day",
+    "create": "Schedule appointment",
+    "saving": "Scheduling...",
+    "dateRange": {
+      "from": "Start date",
+      "to": "End date",
+      "label": "{{start}} to {{end}}"
+    },
+    "form": {
+      "animal": "Animal",
+      "selectAnimal": "Select animal",
+      "createAnimal": "Register new animal",
+      "vet": "Veterinarian",
+      "selectVet": "Select veterinarian",
+      "dateTime": "Date and time",
+      "reason": "Reason for appointment",
+      "reasonPlaceholder": "E.g. vaccination, general check-up, blood test",
+      "service": "Service type",
+      "selectService": "Select service",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes",
+      "duration": "Duration",
+      "weight": "Recorded weight (kg)",
+      "weightPlaceholder": "E.g. 12.5",
+      "animalRequired": "Choose the animal for the appointment.",
+      "vetRequired": "Choose the vet."
+    },
+    "quickPet": {
+      "title": "Quick animal registration",
+      "hint": "Create the animal without losing the appointment details.",
+      "noOwners": "A registered owner is required to create the animal.",
+      "createOwner": "Register new owner",
+      "create": "Register and select"
+    },
+    "quickOwner": {
+      "title": "Quick owner registration",
+      "hint": "Create the owner without losing the animal or appointment details.",
+      "create": "Register and select"
+    },
+    "table": {
+      "time": "Time",
+      "animal": "Animal",
+      "reason": "Reason",
+      "duration": "Duration",
+      "status": "Status",
+      "actions": "Actions",
+      "vet": "Vet"
+    },
+    "status": {
+      "scheduled": "Scheduled",
+      "in-progress": "In progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no-show": "No-show"
+    },
+    "actions": {
+      "start": "Start",
+      "complete": "Complete",
+      "cancel": "Cancel",
+      "noShow": "No-show",
+      "reschedule": "Reschedule",
+      "record": "Record"
+    },
+    "cancelReason": "Cancellation reason",
+    "noShowReason": "No-show reason",
+    "error": "The appointment could not be updated.",
+    "reschedule": {
+      "title": "Reschedule appointment",
+      "hint": "Change the date, duration or vet for {{name}}.",
+      "save": "Save changes"
+    },
+    "rescheduled": "Appointment rescheduled.",
+    "created": "Appointment scheduled.",
+    "cancelTitle": "Cancel {{name}}'s appointment?",
+    "noShowTitle": "Mark {{name}} as no-show?"
+  },
+  "owners": {
+    "title": "Owners",
+    "new": "New owner",
+    "edit": "Edit owner",
+    "noResults": "No owners found",
+    "clearSearch": "Clear search",
+    "search": "Search by name, email or phone...",
+    "count_one": "{{count}} registered owner",
+    "count_other": "{{count}} registered owners",
+    "create": "Create owner",
+    "createHint": "Register a new owner",
+    "editing": "Editing {{name}}",
+    "saveChanges": "Save changes",
+    "archiveConfirm": "{{name}} and their pets will no longer appear in lists. History is kept.",
+    "error": "The owner could not be updated.",
+    "form": {
+      "name": "Full name",
+      "phone": "Phone",
+      "phonePlaceholder": "+244 923 456 789",
+      "email": "Email",
+      "emailPlaceholder": "email@example.com",
+      "address": "Address",
+      "addressPlaceholder": "Street, number, neighbourhood",
+      "nif": "Tax ID",
+      "nifPlaceholder": "Owner tax ID",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes"
+    },
+    "table": {
+      "name": "Name",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address",
+      "actions": "Actions"
+    },
+    "archiveTitle": "Archive owner?",
+    "archived": "{{name}} was archived.",
+    "created": "Owner created.",
+    "updated": "Changes saved.",
+    "editNamed": "Edit {{name}}",
+    "archiveNamed": "Archive {{name}}"
+  },
+  "pets": {
+    "title": "Animals",
+    "new": "New animal",
+    "edit": "Edit animal",
+    "noResults": "No animals found",
+    "search": "Search by name, species or breed...",
+    "count_one": "{{count}} registered animal",
+    "count_other": "{{count}} registered animals",
+    "create": "Register animal",
+    "createHint": "Register a new animal",
+    "editing": "Editing {{name}}",
+    "saveChanges": "Save changes",
+    "archiveConfirm": "{{name}} will no longer appear in lists or receive new appointments. History is kept.",
+    "error": "The animal could not be updated.",
+    "history": "View history",
+    "age": {
+      "lessThanMonth": "< 1 month",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months",
+      "years_one": "{{count}} year",
+      "years_other": "{{count}} years"
+    },
+    "form": {
+      "owner": "Owner",
+      "selectOwner": "Select owner",
+      "name": "Name",
+      "namePlaceholder": "Animal name",
+      "species": "Species",
+      "breed": "Breed",
+      "selectBreed": "Select breed",
+      "breedPlaceholder": "Species description",
+      "breedOptions": "{{count}} options",
+      "birthDate": "Birth date",
+      "weight": "Weight (kg)",
+      "weightPlaceholder": "E.g. 12.5",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes",
+      "ageDisplay": "{{age}} old",
+      "birthDateFormatted": "born {{date}}",
+      "ownerRequired": "Choose the pet's owner."
+    },
+    "table": {
+      "animal": "Animal",
+      "speciesBreed": "Species / Breed",
+      "age": "Age",
+      "weight": "Weight",
+      "actions": "Actions",
+      "view": "View"
+    },
+    "detail": {
+      "title": "Animal details",
+      "notFound": "Animal not found.",
+      "backToList": "Back to list",
+      "tabs": {
+        "appointments": "Appointments",
+        "weight": "Weight",
+        "diagnostics": "Diagnostics",
+        "treatments": "Treatments",
+        "invoices": "Invoices"
+      },
+      "weight": {
+        "history": "Weight history",
+        "subtitle": "Weight changes across appointments",
+        "noData": "No weight records found",
+        "noDataHint": "Weight is recorded during appointments",
+        "lastWeight": "latest weight",
+        "totalVariation": "total change"
+      },
+      "diagnostics": {
+        "noData": "No diagnostics recorded",
+        "noDataHint": "Diagnostics are recorded after appointments",
+        "prescription": "Prescription",
+        "unspecified": "Diagnosis not specified"
+      },
+      "appointments": {
+        "noData": "No appointments recorded",
+        "encounter": "Encounter"
+      },
+      "treatments": {
+        "noData": "No treatments recorded"
+      },
+      "invoices": {
+        "noData": "No invoices recorded",
+        "ownerLevel": "Owner-level"
+      }
+    },
+    "species": {
+      "Cão": "Dog",
+      "Gato": "Cat",
+      "Ave": "Bird",
+      "Roedor": "Rodent",
+      "Coelho": "Rabbit",
+      "Réptil": "Reptile",
+      "Outro": "Other"
+    },
+    "archiveTitle": "Archive pet?",
+    "archived": "{{name}} was archived.",
+    "created": "Pet registered.",
+    "updated": "Changes saved.",
+    "editNamed": "Edit {{name}}",
+    "archiveNamed": "Archive {{name}}"
+  },
+  "treatments": {
+    "title": "Treatments",
+    "new": "New treatment",
+    "edit": "Edit treatment",
+    "noResults": "No treatments recorded",
+    "count_one": "{{count}} treatment recorded",
+    "count_other": "{{count}} treatments recorded",
+    "create": "Create treatment",
+    "saving": "Saving...",
+    "saveChanges": "Save changes",
+    "createHint": "Record a new treatment",
+    "editHint": "Editing treatment",
+    "deleteConfirm": "Delete this treatment?",
+    "appointmentFallback": "Appointment",
+    "createAppointment": "Create new appointment",
+    "form": {
+      "appointment": "Appointment",
+      "selectAppointment": "Select appointment",
+      "diagnosis": "Diagnosis",
+      "diagnosisPlaceholder": "Diagnosis result",
+      "prescription": "Prescription / medication",
+      "prescriptionPlaceholder": "Prescribed medication",
+      "appointmentRequired": "Choose the treatment's appointment."
+    },
+    "voice": {
+      "start": "Dictate",
+      "stop": "Stop dictation",
+      "recording": "Listening",
+      "listening": "Transcribing your speech...",
+      "unsupported": "Voice transcription is not supported in this browser.",
+      "error": "The audio could not be transcribed. Check microphone permission."
+    },
+    "newAppointment": {
+      "title": "New appointment",
+      "hint": "Create an appointment and link it to this treatment.",
+      "create": "Create and select"
+    },
+    "table": {
+      "date": "Date",
+      "appointment": "Appointment",
+      "diagnosis": "Diagnosis",
+      "prescription": "Prescription",
+      "actions": "Actions"
+    },
+    "error": "Could not save the treatment."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Clinic preferences",
+    "clinic": "Clinic",
+    "clinicValue": "Clinic associated with user #{{id}}",
+    "currency": "Currency",
+    "currencyValue": "AOA — Angolan kwanza",
+    "timezone": "Time zone",
+    "timezoneValue": "Africa/Luanda",
+    "billingNif": "Clinic tax ID for billing",
+    "billingNifPlaceholder": "Issuer tax ID",
+    "billingNifHint": "Required to prepare an invoice. The issuer must match the company configured in Vendas.",
+    "billingStoreId": "Vendas store identifier",
+    "billingStoreIdPlaceholder": "storeExternalId assigned by Vendas",
+    "billingStoreIdHint": "Links PATAS requests to the correct Vendas store.",
+    "catalog": {
+      "servicesTitle": "Service types",
+      "servicesHint": "Categories used in the agenda and waiting room.",
+      "newService": "New service",
+      "servicePlaceholder": "E.g. Hospitalization",
+      "examTitle": "Physical exam catalogue",
+      "examHint": "Systems and findings used by veterinarians.",
+      "newSystem": "New system",
+      "systemPlaceholder": "E.g. Neurological assessment",
+      "renamePrompt": "Service name",
+      "findingPrompt": "Finding name",
+      "saved": "Catalogue updated.",
+      "renameTitle": "Rename service",
+      "findingTitle": "New clinical finding",
+      "renameNamed": "Rename {{name}}",
+      "activateNamed": "Activate {{name}}",
+      "deactivateNamed": "Deactivate {{name}}",
+      "addFindingTo": "Add finding to {{name}}"
+    },
+    "loadError": "Some settings could not be loaded.",
+    "saveError": "Could not save the change.",
+    "billingSaved": "Billing details saved."
+  },
+  "users": {
+    "title": "Users",
+    "subtitle": "Team with access to the clinic",
+    "restricted": "Only administrators can manage users.",
+    "empty": "No users found",
+    "create": "Add user",
+    "createTitle": "New team account",
+    "createHint": "Set a temporary password. The user must change it on first sign in.",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "temporaryPassword": "Temporary password",
+    "passwordPending": "Password change pending",
+    "created": "User created successfully.",
+    "createError": "The user could not be created.",
+    "loadError": "Could not load the team.",
+    "updateError": "Could not update the user.",
+    "roleChanged": "{{name}} is now {{role}}.",
+    "activated": "{{name}} was reactivated.",
+    "deactivated": "{{name}} was deactivated and signed out.",
+    "confirmRoleTitle": "Change {{name}}'s role?",
+    "confirmRoleDescription": "The new role will be {{role}}. Permissions change on the next request.",
+    "confirmActivateTitle": "Reactivate {{name}}?",
+    "confirmDeactivateTitle": "Deactivate {{name}}?",
+    "confirmDeactivateDescription": "They can no longer sign in and all open sessions end. History is kept.",
+    "activate": "Reactivate",
+    "deactivate": "Deactivate",
+    "inactive": "Inactive",
+    "roleFor": "Role for {{name}}"
+  },
+  "invoices": {
+    "title": "Invoices",
+    "new": "New invoice",
+    "noResults": "No invoices",
+    "count_one": "{{count}} invoice",
+    "count_other": "{{count}} invoices",
+    "createHint": "Issue a new invoice",
+    "issue": "Issue invoice",
+    "issuing": "Issuing...",
+    "saveDraft": "Save draft",
+    "savingDraft": "Saving...",
+    "cancelReason": "Cancellation reason",
+    "error": "The invoice could not be updated.",
+    "previewError": "The fiscal preview could not be calculated by Vendas.",
+    "trainingNotice": "Billing integration is in trial mode. Vendas TRAINING does not produce fiscally valid documents.",
+    "pendingAlert": {
+      "label": "Pending collection total",
+      "hint_one": "{{amount}} Kz across {{count}} unpaid invoice",
+      "hint_other": "{{amount}} Kz across {{count}} unpaid invoices"
+    },
+    "filter": {
+      "all": "All",
+      "draft": "Draft",
+      "sent": "Sent",
+      "paid": "Paid",
+      "cancelled": "Cancelled"
+    },
+    "form": {
+      "owner": "Owner",
+      "selectOwner": "Select owner",
+      "appointment": "Appointment",
+      "noAppointment": "No related appointment",
+      "paymentMethod": "Payment method",
+      "cashSessionHint": "Cash requires an open cash session in Vendas.",
+      "documentType": "Document type",
+      "missingNif": "Add this owner's tax ID before preparing the invoice.",
+      "items": "Products and services",
+      "itemsHint": "These details will be sent to the billing provider.",
+      "addItem": "Add line",
+      "kind": "Type",
+      "description": "Description",
+      "quantity": "Quantity",
+      "unitPrice": "Unit price",
+      "vatProfile": "VAT profile",
+      "vatProfileDefault": "Default",
+      "taxRate": "Tax (%)",
+      "ownerRequired": "Choose the owner to invoice.",
+      "saveNif": "Save NIF",
+      "nifSaved": "Owner NIF updated.",
+      "removeItem": "Remove line"
+    },
+    "documentType": {
+      "FT": "Invoice (FT) — payment later",
+      "FR": "Invoice-receipt (FR) — immediate payment"
+    },
+    "lineKind": {
+      "SERVICE": "Service",
+      "PRODUCT": "Product"
+    },
+    "paymentMethod": {
+      "cash": "Cash",
+      "bank-transfer": "Bank transfer",
+      "tpa": "Card terminal",
+      "other": "Other"
+    },
+    "summary": {
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "total": "Total",
+      "commercialSubtotal": "Commercial subtotal",
+      "providerTotalHint": "VAT and the final fiscal total are calculated by Vendas when the document is issued."
+    },
+    "quote": {
+      "providerTotal": "Total calculated by Vendas"
+    },
+    "table": {
+      "number": "No.",
+      "owner": "Owner",
+      "value": "Amount",
+      "status": "Status",
+      "description": "Description",
+      "date": "Date",
+      "actions": "Actions"
+    },
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "paid": "Paid",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "preview": "Calculate in Vendas",
+      "send": "Issue in Vendas",
+      "sendHint": "Send to the payment system",
+      "markPaid": "Paid",
+      "markPaidHint": "Mark as paid",
+      "openDocument": "Open issued document",
+      "retry": "Retry emission",
+      "cancel": "Cancel draft",
+      "checkPayment": "Check payment"
+    },
+    "search": "Search by number, customer or owner",
+    "sync": {
+      "failed": "Emission failed"
+    },
+    "emit": {
+      "title": "Issue fiscal document?",
+      "retryTitle": "Retry the pending emission?",
+      "description": "Issuing in Vendas cannot be undone. Check the customer and total before continuing."
+    },
+    "reconcileError": "Could not check the payment in Vendas.",
+    "cancelTitle": "Cancel this draft?",
+    "draftSaved": "Draft saved. Calculate the Vendas preview to issue it."
+  },
+  "clinical": {
+    "timeline": {
+      "title": "Clinical timeline",
+      "empty": "No clinical records yet",
+      "appointment": "Appointment",
+      "treatment": "Treatment",
+      "vet": "Veterinarian: {{name}}"
+    },
+    "form": {
+      "vet": "Responsible veterinarian",
+      "selectVet": "Select veterinarian",
+      "appointment": "Related appointment",
+      "noAppointment": "No related appointment",
+      "notes": "Notes"
+    },
+    "vaccinations": {
+      "title": "Vaccines",
+      "item": "Vaccine",
+      "new": "New vaccine",
+      "empty": "No vaccines recorded",
+      "form": {
+        "name": "Vaccine name",
+        "dose": "Dose",
+        "date": "Administration date",
+        "lot": "Batch",
+        "expiry": "Expiry date",
+        "nextDose": "Next dose"
+      }
+    },
+    "medications": {
+      "title": "Medications",
+      "item": "Medication",
+      "new": "New medication",
+      "empty": "No medications recorded",
+      "form": {
+        "name": "Medication name",
+        "dosage": "Dosage",
+        "frequency": "Frequency",
+        "route": "Administration route",
+        "start": "Start date",
+        "end": "End date",
+        "instructions": "Instructions"
+      }
+    },
+    "status": {
+      "administered": "Administered",
+      "active": "Active",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "voided": "Voided"
+    },
+    "actions": {
+      "void": "Void",
+      "voidPrompt": "Reason for voiding",
+      "complete": "Complete",
+      "cancel": "Cancel",
+      "voidTitle": "Void {{name}}?"
+    },
+    "errors": {
+      "save": "Could not save the clinical record.",
+      "void": "Could not void the clinical record."
+    }
+  },
+  "waitingRoom": {
+    "eyebrow": "Clinic operations",
+    "title": "Waiting room",
+    "subtitle": "Track arrivals, calls and active appointments.",
+    "all": "All",
+    "newWalkIn": "New entry",
+    "queueTitle": "Today's entries",
+    "queueHint": "Filter by service or search by animal and owner.",
+    "search": "Search animal or owner...",
+    "empty": "No entries in the waiting room",
+    "defaultService": "Appointment",
+    "defaultReason": "Clinical visit",
+    "scheduledTitle": "Scheduled appointments",
+    "scheduledHint": "Register arrival when the client reaches the clinic.",
+    "scheduledEmpty": "There are no scheduled appointments outside the queue.",
+    "unknownPet": "Unknown animal",
+    "walkInTitle": "New walk-in entry",
+    "walkInHint": "Create the appointment and add the animal to the queue in one step.",
+    "create": "Add to queue",
+    "status": {
+      "waiting": "Waiting",
+      "called": "Called",
+      "in-progress": "In progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no-show": "No-show"
+    },
+    "actions": {
+      "checkIn": "Check in",
+      "call": "Call",
+      "start": "Start",
+      "complete": "Complete",
+      "noShow": "No-show",
+      "cancel": "Cancel",
+      "cancelPrompt": "Cancellation reason",
+      "noShowPrompt": "No-show reason",
+      "openClinical": "Open encounter",
+      "cancelTitle": "Cancel {{name}}'s entry?",
+      "noShowTitle": "Mark {{name}} as no-show?"
+    },
+    "form": {
+      "pet": "Animal",
+      "selectPet": "Select animal",
+      "vet": "Veterinarian",
+      "selectVet": "Select veterinarian",
+      "service": "Service",
+      "selectService": "Select service",
+      "reason": "Reason",
+      "reasonPlaceholder": "E.g. cough, pain, vaccination",
+      "room": "Room",
+      "roomPlaceholder": "E.g. Consultation room 1",
+      "message": "Message",
+      "messagePlaceholder": "Note for the team"
+    },
+    "errors": {
+      "load": "The waiting room could not be loaded.",
+      "save": "The entry could not be added.",
+      "transition": "The entry status could not be updated."
+    },
+    "date": "Queue date",
+    "checkedIn": "{{name}} joined the queue."
+  },
+  "clinicalAppointment": {
+    "responsible": "Responsible veterinarian",
+    "save": "Save encounter",
+    "start": "Start encounter",
+    "complete": "Complete appointment",
+    "saved": "Encounter saved.",
+    "started": "Encounter started.",
+    "completed": "Appointment completed.",
+    "examTitle": "Physical examination",
+    "examHint": "Record relevant findings; everything else remains not evaluated.",
+    "abnormal": "abnormal findings",
+    "finding": {
+      "notEvaluated": "Not evaluated",
+      "normal": "Normal",
+      "abnormal": "Abnormal",
+      "note": "Specific observation"
+    },
+    "historyTitle": "History and diagnosis",
+    "anamnesis": "History",
+    "consultationType": "Visit type",
+    "referringVet": "Referring veterinarian",
+    "noReferringVet": "No referring veterinarian",
+    "types": {
+      "normal": "Normal",
+      "urgent": "Urgent",
+      "return": "Return visit"
+    },
+    "diagnosis": "Diagnosis",
+    "notes": "Clinical notes",
+    "prescriptionTitle": "Structured prescription",
+    "prescriptionHint": "Link medicines to the appointment and keep additional instructions below.",
+    "addMedication": "Add medicine",
+    "noMedications": "There are no medicines in this prescription yet.",
+    "newMedication": "New medicine",
+    "medication": {
+      "name": "Medicine",
+      "dosage": "Dosage",
+      "frequency": "Frequency",
+      "route": "Route",
+      "start": "Start",
+      "end": "End",
+      "instructions": "Instructions"
+    },
+    "freePrescription": "Free prescription and instructions",
+    "freePrescriptionPlaceholder": "Additional instructions for the owner...",
+    "petSummary": "Animal summary",
+    "openPet": "Open full record",
+    "openEncounter": "Open encounter",
+    "errors": {
+      "load": "The clinical encounter could not be loaded.",
+      "start": "The encounter could not be started.",
+      "save": "The encounter could not be saved.",
+      "complete": "The appointment could not be completed.",
+      "notFound": "Appointment or animal not found."
+    },
+    "correction": {
+      "label": "Correction reason",
+      "hint": "This visit is completed. Every change is recorded in the audit log with the reason given.",
+      "required": "Enter the correction reason before saving."
+    },
+    "archivedSubject": "The pet or owner of this appointment is archived. The clinical record is read-only and the appointment can only be cancelled."
   },
   "common": {
     "save": "Save",
@@ -23,6 +746,64 @@
     "loading": "Loading...",
     "error": "An error occurred",
     "success": "Operation successful",
-    "required": "required"
+    "required": "required",
+    "back": "Back",
+    "to": "to",
+    "min": "min",
+    "kg": "kg",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "useLightTheme": "Use light theme",
+    "useDarkTheme": "Use dark theme",
+    "saving": "Saving...",
+    "add": "Add",
+    "archived": "Archived",
+    "archive": "Archive",
+    "close": "Close",
+    "noResults": "No results",
+    "openOptions": "Open options",
+    "minutesShort": "{{count}} min",
+    "retry": "Try again"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "vet": "Veterinarian",
+    "receptionist": "Receptionist"
+  },
+  "form": {
+    "required": "*",
+    "optional": "(optional)",
+    "selectOption": "Select an option",
+    "minutes": "{{count}} minutes",
+    "age": {
+      "underMonth": "< 1 month",
+      "month": "month",
+      "months": "months",
+      "year": "year",
+      "years": "years"
+    }
+  },
+  "status": {
+    "scheduled": "Scheduled",
+    "called": "Called",
+    "in-progress": "In progress",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "no-show": "No-show",
+    "draft": "Draft",
+    "paid": "Paid",
+    "administered": "Administered",
+    "active": "Active",
+    "voided": "Voided"
+  },
+  "pagination": {
+    "range": "{{from}}–{{to}} of {{total}}",
+    "previous": "Previous page",
+    "next": "Next page"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The address does not exist or was moved.",
+    "back": "Back to dashboard"
   }
 }

@@ -1,24 +1,39 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Request, Response
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
 from src.core.database import get_db
-from src.core.deps import CurrentUser, get_current_user, require_permission
-from src.models.treatment import Treatment
+from src.core.deps import CurrentUser, require_permission
+from src.core.pagination import Limit, Skip
 from src.models.appointment import Appointment
-from src.schemas.treatment import TreatmentCreate, TreatmentUpdate, TreatmentResponse
+from src.models.treatment import Treatment
+from src.models.user import User, UserRole
+from src.schemas.treatment import TreatmentCreate, TreatmentResponse, TreatmentUpdate
+from src.services.appointment_lifecycle import clinical_correction_reason
 from src.services.audit import audit
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[TreatmentResponse])
+def _validate_referring_vet(db: Session, clinic_id: int, vet_id: int | None) -> None:
+    if vet_id is None:
+        return
+    vet = db.query(User).filter(
+        User.id == vet_id,
+        User.clinic_id == clinic_id,
+        User.role.in_([UserRole.VET, UserRole.ADMIN]),
+    ).first()
+    if not vet:
+        raise HTTPException(status_code=422, detail="O veterinário referenciador não pertence à clínica")
+
+
+@router.get("/", response_model=list[TreatmentResponse])
 def list_treatments(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
-    appointment_id: Optional[int] = None,
-    current_user: CurrentUser = Depends(get_current_user),
+    skip: Skip = 0,
+    limit: Limit = 100,
+    appointment_id: int | None = None,
+    current_user: CurrentUser = Depends(require_permission("treatment:read")),
     db: Session = Depends(get_db),
 ):
     query = db.query(Treatment).filter(Treatment.clinic_id == current_user.clinic_id)
@@ -42,7 +57,11 @@ def create_treatment(
         Appointment.clinic_id == current_user.clinic_id,
     ).first()
     if not appointment:
-        raise HTTPException(status_code=404, detail="Consulta nГЈo encontrada")
+        raise HTTPException(status_code=404, detail="Consulta não encontrada")
+    if db.query(Treatment.id).filter(Treatment.appointment_id == appointment.id).first():
+        raise HTTPException(status_code=409, detail="Esta consulta já tem um tratamento registado")
+    clinical_correction_reason(appointment, current_user.role, None, has_existing_record=False)
+    _validate_referring_vet(db, current_user.clinic_id, data.referring_vet_id)
 
     treatment = Treatment(clinic_id=current_user.clinic_id, **data.model_dump())
     db.add(treatment)
@@ -55,7 +74,7 @@ def create_treatment(
         action="CREATE",
         resource="treatment",
         resource_id=treatment.id,
-        details={"appointment_id": treatment.appointment_id, "diagnosis": treatment.diagnosis},
+        details={"appointment_id": treatment.appointment_id},
         ip_address=request.client.host if request else None,
     )
     return treatment
@@ -72,7 +91,7 @@ def get_treatment(
         Treatment.clinic_id == current_user.clinic_id,
     ).first()
     if not t:
-        raise HTTPException(status_code=404, detail="Tratamento nГЈo encontrado")
+        raise HTTPException(status_code=404, detail="Tratamento não encontrado")
     return t
 
 
@@ -89,8 +108,12 @@ def update_treatment(
         Treatment.clinic_id == current_user.clinic_id,
     ).first()
     if not t:
-        raise HTTPException(status_code=404, detail="Tratamento nГЈo encontrado")
+        raise HTTPException(status_code=404, detail="Tratamento não encontrado")
     updates = data.model_dump(exclude_unset=True)
+    correction_reason = clinical_correction_reason(
+        t.appointment, current_user.role, updates.pop("correction_reason", None), has_existing_record=True,
+    )
+    _validate_referring_vet(db, current_user.clinic_id, updates.get("referring_vet_id", t.referring_vet_id))
     for key, value in updates.items():
         setattr(t, key, value)
     db.commit()
@@ -102,7 +125,10 @@ def update_treatment(
         action="UPDATE",
         resource="treatment",
         resource_id=t.id,
-        details=updates,
+        details={
+            "fields": sorted(updates),
+            **({"correction_reason": correction_reason} if correction_reason else {}),
+        },
         ip_address=request.client.host if request else None,
     )
     return t
@@ -115,23 +141,7 @@ def delete_treatment(
     db: Session = Depends(get_db),
     request: Request = None,
 ):
-    t = db.query(Treatment).filter(
-        Treatment.id == treatment_id,
-        Treatment.clinic_id == current_user.clinic_id,
-    ).first()
-    if not t:
-        raise HTTPException(status_code=404, detail="Tratamento nГЈo encontrado")
-    diag = t.diagnosis
-    db.delete(t)
-    db.commit()
-    audit(
-        db,
-        clinic_id=current_user.clinic_id,
-        user_id=current_user.id,
-        action="DELETE",
-        resource="treatment",
-        resource_id=treatment_id,
-        details={"diagnosis": diag},
-        ip_address=request.client.host if request else None,
+    raise HTTPException(
+        status_code=405,
+        detail="Tratamentos clínicos não podem ser eliminados; efetue uma correção auditada",
     )
-    return {"ok": True}

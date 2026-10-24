@@ -1,7 +1,9 @@
-﻿from pydantic import BaseModel, Field
 from datetime import datetime
 
+from pydantic import BaseModel, Field, field_validator
+
 from src.models.appointment import AppointmentStatus
+from src.schemas.common import reject_null
 
 
 class AppointmentCreate(BaseModel):
@@ -12,15 +14,25 @@ class AppointmentCreate(BaseModel):
     reason: str | None = Field(None, max_length=255)
     notes: str | None = Field(None, max_length=2000)
     weight: float | None = Field(None, ge=0)
+    service_type_id: int | None = None
 
 
 class AppointmentUpdate(BaseModel):
+    pet_id: int | None = None
+    vet_id: int | None = None
     scheduled_at: datetime | None = None
     duration_min: int | None = Field(None, ge=15, le=480)
     status: AppointmentStatus | None = None
+    status_reason: str | None = Field(None, max_length=255)
     reason: str | None = Field(None, max_length=255)
     notes: str | None = Field(None, max_length=2000)
     weight: float | None = Field(None, ge=0)
+    service_type_id: int | None = None
+
+    @field_validator("pet_id", "vet_id", "scheduled_at", "duration_min", mode="before")
+    @classmethod
+    def _reject_null(cls, value):
+        return reject_null(value)
 
 
 class AppointmentResponse(BaseModel):
@@ -32,10 +44,16 @@ class AppointmentResponse(BaseModel):
     scheduled_at: datetime
     duration_min: int
     status: AppointmentStatus
+    status_reason: str | None
     reason: str | None
     notes: str | None
     weight: float | None
+    service_type_id: int | None
     created_at: datetime
+    pet_name: str | None = None
+    owner_name: str | None = None
+    vet_name: str | None = None
+    subject_archived: bool = False
 
     class Config:
         from_attributes = True

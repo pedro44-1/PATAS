@@ -1,0 +1,34 @@
+# Frontend API clients
+
+## Purpose
+
+Own axios configuration and typed modules for authentication, clinics, users, owners, pets, appointments, treatments, invoices, dashboard data, service types, the waiting room, exam catalogues, and clinical encounters.
+
+## Ownership
+
+API modules translate frontend requests/responses to the backend `/api/v1` contract. Components and pages own presentation and interaction state.
+
+## Local Contracts
+
+- Use the shared client for base URL, bearer token, refresh, and error handling.
+- Keep request payloads and response types aligned with backend Pydantic schemas and shared types.
+- Preserve clinic-scoped behavior; do not add client-side shortcuts that bypass server authorization.
+- Update locale-independent API error handling without exposing raw secrets or tokens.
+- Serialize all API datetimes as UTC and parse database timezone-less values as UTC before displaying them in Luanda time.
+- List clients take `PageParams` (`skip`, `limit`, `q`) plus resource filters; read totals with `totalCount` from `pagination.ts`. Use `PAGE_SIZE` for paged tables and `OPTIONS_LIMIT` (200) for selector option lists; resolve a single owner/pet with `get(id)`, never by scanning a list.
+- Preserve the appointment list client's single-date compatibility while serializing agenda intervals as `date_from` and `date_to`.
+- Refresh rotation is single-flight; logout and password change send the refresh token and replace/clear both stored tokens atomically.
+- `apiErrorMessage` prefers a flow-specific status key, then a human-readable backend string `detail` (except for `401`) or a backend-authored validation message (`Value error, …` from our Pydantic validators), then the localized status message; never render raw FastAPI field errors or machine codes.
+- Invoice clients obtain a provider preview before emission; quote metadata comes from the backend and must never be calculated or fabricated in the browser.
+
+## Work Guidance
+
+When an endpoint changes, update its API module, consuming screens, shared types if applicable, and API documentation together. Keep status strings exactly aligned with the backend. Queue transitions, service configuration, exam findings, and clinical-record payloads must remain aligned with the shared package and backend schemas.
+
+## Verification
+
+Run `npm run build` from `frontend` and exercise the affected flow against the local API when available.
+
+## Child DOX Index
+
+No child DOX documents.

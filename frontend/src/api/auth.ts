@@ -1,29 +1,17 @@
+import type {
+  ClinicRegistration,
+  LogoutRequest,
+  PasswordChange,
+  Token,
+  UserLogin,
+  UserResponse,
+} from "@patas/shared-types";
 import api from "./client";
 
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-  role: "vet" | "receptionist";
-}
-
-export interface User {
-  id: number;
-  clinic_id: number;
-  name: string;
-  email: string;
-  role: "vet" | "receptionist";
-}
-
-export interface Token {
-  access_token: string;
-  token_type: string;
-}
+export type LoginPayload = UserLogin;
+export type RegisterPayload = ClinicRegistration;
+export type User = UserResponse;
+export type { Token };
 
 export const authApi = {
   login: (data: LoginPayload) =>
@@ -34,4 +22,10 @@ export const authApi = {
 
   me: () =>
     api.get<User>("/auth/me"),
+
+  changePassword: (data: PasswordChange) =>
+    api.post<Token>("/auth/change-password", data),
+
+  logout: (data: LogoutRequest) =>
+    api.post<{ ok: boolean; message: string }>("/auth/logout", data),
 };

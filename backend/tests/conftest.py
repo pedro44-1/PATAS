@@ -1,16 +1,19 @@
-﻿import os
-os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+import os
 
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+os.environ["VENDAS_DEFAULT_VAT_PROFILE_CODE"] = "VAT-STD"
+
+
+from datetime import UTC
+
+import fakeredis.aioredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from unittest.mock import AsyncMock, MagicMock, patch
 
-import fakeredis.aioredis
-
-from src.core.database import get_db, Base
+from src.core.database import Base, get_db
 from src.core.security import hash_password
 from src.models import *
 from src.services.cache import cache as cache_service
@@ -43,6 +46,13 @@ def mock_redis():
         _blacklist.add(jti)
         return True
     cache_service.blacklist_token = mock_blacklist_token
+
+    async def mock_blacklist_token_if_absent(jti, ttl):
+        if jti in _blacklist:
+            return False
+        _blacklist.add(jti)
+        return True
+    cache_service.blacklist_token_if_absent = mock_blacklist_token_if_absent
     
     # Mock check_rate_limit to always succeed (avoid cross-test rate limit accumulation)
     async def mock_check_rate_limit(key, max_attempts, window):
@@ -81,7 +91,6 @@ def seed_permission_data(setup_database):
 
 @pytest.fixture(scope="function")
 def db_session():
-    from src.main import app
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
@@ -110,7 +119,14 @@ def client(db_session):
 @pytest.fixture(scope="function")
 def clinic(db_session):
     from src.models.clinic import Clinic
-    clinic = Clinic(name="Test Clinic", address="Test Address", phone="123456789", email="test@clinic.com")
+    clinic = Clinic(
+        name="Test Clinic",
+        address="Test Address",
+        phone="123456789",
+        email="test@clinic.com",
+        nif="5000000000",
+        billing_store_external_id="patas-test-store",
+    )
     db_session.add(clinic)
     db_session.commit()
     db_session.refresh(clinic)
@@ -124,6 +140,22 @@ def vet_user(db_session, clinic):
         clinic_id=clinic.id,
         name="Dr. Vet",
         email="vet@test.com",
+        password_hash=hash_password("Password1"),
+        role=UserRole.VET,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture(scope="function")
+def admin_user(db_session, clinic):
+    from src.models.user import User, UserRole
+    user = User(
+        clinic_id=clinic.id,
+        name="Admin",
+        email="admin@test.com",
         password_hash=hash_password("Password1"),
         role=UserRole.ADMIN,
     )
@@ -156,6 +188,12 @@ def vet_token(client, vet_user):
 
 
 @pytest.fixture(scope="function")
+def admin_token(client, admin_user):
+    response = client.post("/api/v1/auth/login", json={"email": "admin@test.com", "password": "Password1"})
+    return response.json()["access_token"]
+
+
+@pytest.fixture(scope="function")
 def receptionist_token(client, receptionist_user):
     response = client.post("/api/v1/auth/login", json={"email": "receptionist@test.com", "password": "Password1"})
     return response.json()["access_token"]
@@ -164,6 +202,11 @@ def receptionist_token(client, receptionist_user):
 @pytest.fixture(scope="function")
 def vet_headers(vet_token):
     return {"Authorization": f"Bearer {vet_token}"}
+
+
+@pytest.fixture(scope="function")
+def admin_headers(admin_token):
+    return {"Authorization": f"Bearer {admin_token}"}
 
 
 @pytest.fixture(scope="function")
@@ -180,6 +223,7 @@ def owner(db_session, clinic):
         phone="+244 900 000 000",
         email="owner@test.com",
         address="Test Address",
+        nif="5412345678",
         notes="Test notes",
     )
     db_session.add(owner)
@@ -190,13 +234,14 @@ def owner(db_session, clinic):
 
 @pytest.fixture(scope="function")
 def pet(db_session, clinic, owner):
-    from src.models.pet import Pet
     from decimal import Decimal
+
+    from src.models.pet import Pet
     pet = Pet(
         clinic_id=clinic.id,
         owner_id=owner.id,
         name="Test Pet",
-        species="CГЈo",
+        species="Cão",
         breed="SRD",
         weight=Decimal("10.5"),
         notes="Test pet",
@@ -209,14 +254,15 @@ def pet(db_session, clinic, owner):
 
 @pytest.fixture(scope="function")
 def appointment(db_session, clinic, pet, vet_user):
+    from datetime import datetime, timedelta
+
     from src.models.appointment import Appointment, AppointmentStatus
-    from datetime import datetime, timezone, timedelta
     appointment = Appointment(
         clinic_id=clinic.id,
         pet_id=pet.id,
         vet_id=vet_user.id,
         owner_id=pet.owner_id,
-        scheduled_at=datetime.now(timezone.utc) + timedelta(days=1),
+        scheduled_at=datetime.now(UTC) + timedelta(days=1),
         duration_min=30,
         status=AppointmentStatus.SCHEDULED,
         reason="Test appointment",
@@ -246,7 +292,9 @@ def treatment(db_session, clinic, appointment):
 
 @pytest.fixture(scope="function")
 def invoice(db_session, clinic, owner, appointment):
-    from src.models.invoice import Invoice, InvoiceStatus
+    from decimal import Decimal
+
+    from src.models.invoice import Invoice, InvoiceLine, InvoiceStatus
     invoice = Invoice(
         clinic_id=clinic.id,
         owner_id=owner.id,
@@ -254,7 +302,25 @@ def invoice(db_session, clinic, owner, appointment):
         amount=100.0,
         status=InvoiceStatus.DRAFT,
         description="Test invoice",
+        subtotal=Decimal("100.00"),
+        tax_total=Decimal("0.00"),
+        issuer_name=clinic.name,
+        issuer_nif=clinic.nif,
+        issuer_store_external_id=clinic.billing_store_external_id,
+        customer_name=owner.name,
+        customer_nif=owner.nif,
+        customer_email=owner.email,
     )
+    invoice.lines.append(InvoiceLine(
+        clinic_id=clinic.id,
+        description="Test invoice",
+        quantity=Decimal("1"),
+        unit_price=Decimal("100.00"),
+        tax_rate=Decimal("0"),
+        subtotal=Decimal("100.00"),
+        tax_amount=Decimal("0.00"),
+        total=Decimal("100.00"),
+    ))
     db_session.add(invoice)
     db_session.commit()
     db_session.refresh(invoice)

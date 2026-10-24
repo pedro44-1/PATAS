@@ -12,7 +12,10 @@
     "./pet": "./dist/pet.js",
     "./appointment": "./dist/appointment.js",
     "./treatment": "./dist/treatment.js",
-    "./invoice": "./dist/invoice.js"
+    "./invoice": "./dist/invoice.js",
+    "./service-type": "./dist/service-type.js",
+    "./waiting-room": "./dist/waiting-room.js",
+    "./clinical": "./dist/clinical.js"
   },
   "scripts": {
     "build": "tsc --build",

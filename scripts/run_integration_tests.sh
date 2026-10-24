@@ -3,6 +3,10 @@ set -euo pipefail
 
 COMPOSE_FILE="${1:-docker-compose.test.yml}"
 PROJECT_NAME="${2:-patas-test}"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [[ "$COMPOSE_FILE" != /* ]]; then
+  COMPOSE_FILE="$REPO_ROOT/$COMPOSE_FILE"
+fi
 
 echo "=== PATAS Integration Test Runner ==="
 echo ""
@@ -41,5 +45,6 @@ fi
 echo ""
 echo "Running integration tests..."
 export BASE_URL="http://localhost:8001"
+export POSTGRES_ADMIN_URL="postgresql://patas:patas_test_password@localhost:5433/postgres"
 cd "$(dirname "$0")/../backend"
-python -m pytest tests/test_integration.py -v --tb=long
+python -m pytest tests/test_integration.py tests/test_postgres_migrations.py -m integration -v --tb=long

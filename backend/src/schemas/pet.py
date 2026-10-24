@@ -1,24 +1,32 @@
-﻿from pydantic import BaseModel, Field
-from datetime import datetime, date
+from datetime import date, datetime
+
+from pydantic import BaseModel, Field, field_validator
+
+from src.schemas.common import OptionalText, reject_null
 
 
 class PetCreate(BaseModel):
     owner_id: int
     name: str = Field(..., min_length=1, max_length=100)
     species: str = Field(..., min_length=1, max_length=50)
-    breed: str | None = Field(None, max_length=100)
+    breed: OptionalText = Field(None, max_length=100)
     birth_date: date | None = None
     weight: float | None = Field(None, ge=0)
-    notes: str | None = Field(None, max_length=1000)
+    notes: OptionalText = Field(None, max_length=1000)
 
 
 class PetUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     species: str | None = Field(None, min_length=1, max_length=50)
-    breed: str | None = Field(None, max_length=100)
+    breed: OptionalText = Field(None, max_length=100)
     birth_date: date | None = None
     weight: float | None = Field(None, ge=0)
-    notes: str | None = Field(None, max_length=1000)
+    notes: OptionalText = Field(None, max_length=1000)
+
+    @field_validator("name", "species", mode="before")
+    @classmethod
+    def _reject_null(cls, value):
+        return reject_null(value)
 
 
 class PetResponse(BaseModel):
@@ -31,7 +39,10 @@ class PetResponse(BaseModel):
     birth_date: date | None
     weight: float | None
     notes: str | None
+    archived_at: datetime | None
+    archived_by_user_id: int | None
     created_at: datetime
+    owner_name: str | None = None
 
     class Config:
         from_attributes = True
