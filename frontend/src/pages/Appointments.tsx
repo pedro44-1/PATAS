@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { FormError } from "@/components/ui/form-error";
-import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { appointmentsApi, Appointment, AppointmentCreate, VetOption } from "@/api/appointments";
+import { appointmentsApi, Appointment, AppointmentCreate, AppointmentStatus, VetOption } from "@/api/appointments";
 import { petsApi, Pet, PetCreate } from "@/api/pets";
 import { ownersApi, Owner, OwnerCreate } from "@/api/owners";
 import { serviceTypesApi } from "@/api/serviceTypes";
@@ -11,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormSelect } from "@/components/ui/form-select";
-import { Badge } from "@/components/ui/badge";
+import { FormError } from "@/components/ui/form-error";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { PromptDialog } from "@/components/ui/prompt-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -22,15 +23,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { clinicDateInput, parseApiDate } from "@/lib/date";
-import { Plus, Search, CalendarDays, Check, X } from "lucide-react";
+import { clinicDateInput, clinicDateTimeInput, parseApiDate } from "@/lib/date";
+import { useRemoteOptions } from "@/lib/use-remote-options";
+import { Archive, CalendarClock, CalendarDays, Check, ClipboardList, Plus, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/contexts/ToastContext";
 import { apiErrorMessage } from "@/api/errors";
 import { OPTIONS_LIMIT } from "@/api/pagination";
 
 const CREATE_PET_VALUE = "__create_pet__";
 const CREATE_OWNER_VALUE = "__create_owner__";
 const PET_SPECIES = ["Cão", "Gato", "Ave", "Roedor", "Coelho", "Réptil", "Outro"] as const;
+const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
+
+type ReasonStatus = Extract<AppointmentStatus, "cancelled" | "no-show">;
 
 function statusConfig(status: string) {
   if (status === "in-progress")
@@ -44,9 +50,21 @@ function statusConfig(status: string) {
   return { key: "scheduled", bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" };
 }
 
+const emptyForm = (scheduledAt: string, vetId = 0): AppointmentCreate => ({
+  pet_id: 0,
+  vet_id: vetId,
+  scheduled_at: scheduledAt,
+  duration_min: 30,
+  reason: "",
+  notes: "",
+  weight: undefined,
+  service_type_id: undefined,
+});
+
 export default function Appointments() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const toast = useToast();
   const canWriteClinical = user?.role === "admin" || user?.role === "vet";
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
@@ -55,21 +73,15 @@ export default function Appointments() {
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [filterStartDate, setFilterStartDate] = useState(clinicDateInput());
   const [filterEndDate, setFilterEndDate] = useState(clinicDateInput());
-  const [form, setForm] = useState<AppointmentCreate>({
-    pet_id: 0,
-    vet_id: 0,
-    scheduled_at: "",
-    duration_min: 30,
-    reason: "",
-    notes: "",
-    weight: undefined,
-    service_type_id: undefined,
-  });
+  const [form, setForm] = useState<AppointmentCreate>(emptyForm(""));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [reasonTarget, setReasonTarget] = useState<{ appointment: Appointment; status: ReasonStatus } | null>(null);
   const [showQuickPet, setShowQuickPet] = useState(false);
   const [savingPet, setSavingPet] = useState(false);
   const [petError, setPetError] = useState("");
@@ -78,9 +90,12 @@ export default function Appointments() {
   const [savingOwner, setSavingOwner] = useState(false);
   const [ownerError, setOwnerError] = useState("");
   const [ownerForm, setOwnerForm] = useState<OwnerCreate>({ name: "", phone: "", email: "" });
+  const petSearch = useRemoteOptions((query) => petsApi.list({ q: query, limit: 50 }).then((response) => response.data));
+  const ownerSearch = useRemoteOptions((query) => ownersApi.list({ q: query, limit: 50 }).then((response) => response.data));
 
   function load() {
     setLoading(true);
+    setError("");
     Promise.all([appointmentsApi.list({ dateFrom: filterStartDate, dateTo: filterEndDate, limit: OPTIONS_LIMIT }), petsApi.list({ limit: OPTIONS_LIMIT }), ownersApi.list({ limit: OPTIONS_LIMIT }), appointmentsApi.vets(), serviceTypesApi.list()])
       .then(([apptsRes, petsRes, ownersRes, vetsRes, serviceTypesRes]) => {
         setAppointments(apptsRes.data);
@@ -89,29 +104,39 @@ export default function Appointments() {
         setVets(vetsRes.data);
         setServiceTypes(serviceTypesRes.data);
       })
+      .catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "appointments.error")))
       .finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [filterStartDate, filterEndDate]);
 
   function openCreate() {
-    const defaultTime = `${filterStartDate}T09:00`;
+    const ownVet = user?.role === "vet" ? user.id : 0;
+    setEditingAppointment(null);
+    setForm(emptyForm(`${filterStartDate}T09:00`, ownVet));
+    setFormError("");
+    setShowForm(true);
+  }
+
+  function openReschedule(appointment: Appointment) {
+    setEditingAppointment(appointment);
     setForm({
-      pet_id: pets[0]?.id ?? 0,
-      vet_id: vets[0]?.id ?? 0,
-      scheduled_at: defaultTime,
-      duration_min: 30,
-      reason: "",
-      notes: "",
+      pet_id: appointment.pet_id,
+      vet_id: appointment.vet_id,
+      scheduled_at: clinicDateTimeInput(parseApiDate(appointment.scheduled_at)),
+      duration_min: appointment.duration_min,
+      reason: appointment.reason ?? "",
+      notes: appointment.notes ?? "",
       weight: undefined,
-      service_type_id: serviceTypes[0]?.id,
+      service_type_id: appointment.service_type_id ?? undefined,
     });
+    setFormError("");
     setShowForm(true);
   }
 
   function openQuickPet() {
     setPetError("");
-    setPetForm({ owner_id: owners[0]?.id ?? 0, name: "", species: "Cão" });
+    setPetForm({ owner_id: 0, name: "", species: "Cão" });
     setShowQuickPet(true);
   }
 
@@ -148,7 +173,7 @@ export default function Appointments() {
         email: ownerForm.email || undefined,
       });
       const createdOwner = response.data;
-      setOwners((current) => [...current, createdOwner]);
+      setOwners((current) => [createdOwner, ...current]);
       setPetForm((current) => ({ ...current, owner_id: createdOwner.id }));
       setShowQuickOwner(false);
     } catch (requestError: unknown) {
@@ -160,12 +185,16 @@ export default function Appointments() {
 
   async function handleQuickPetSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!petForm.owner_id) {
+      setPetError(t("pets.form.ownerRequired"));
+      return;
+    }
     setSavingPet(true);
     setPetError("");
     try {
       const response = await petsApi.create(petForm);
       const createdPet = response.data;
-      setPets((current) => [...current, createdPet]);
+      setPets((current) => [createdPet, ...current]);
       setForm((current) => ({ ...current, pet_id: createdPet.id }));
       setShowQuickPet(false);
     } catch (requestError: unknown) {
@@ -177,10 +206,28 @@ export default function Appointments() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.pet_id || !form.vet_id) {
+      setFormError(t(!form.pet_id ? "appointments.form.animalRequired" : "appointments.form.vetRequired"));
+      return;
+    }
     setSaving(true);
     setFormError("");
     try {
-      await appointmentsApi.create(form);
+      if (editingAppointment) {
+        await appointmentsApi.update(editingAppointment.id, {
+          pet_id: form.pet_id,
+          vet_id: form.vet_id,
+          scheduled_at: form.scheduled_at,
+          duration_min: form.duration_min,
+          reason: form.reason,
+          notes: form.notes,
+          service_type_id: form.service_type_id,
+        });
+        toast.success(t("appointments.rescheduled"));
+      } else {
+        await appointmentsApi.create(form);
+        toast.success(t("appointments.created"));
+      }
       setShowForm(false);
       load();
     } catch (requestError: unknown) {
@@ -190,24 +237,26 @@ export default function Appointments() {
     }
   }
 
-  async function handleStatus(id: number, status: string) {
-    const requiresReason = status === "cancelled" || status === "no-show";
-    const status_reason = requiresReason
-      ? window.prompt(t(status === "cancelled" ? "appointments.cancelReason" : "appointments.noShowReason")) ?? ""
-      : undefined;
-    if (requiresReason && !status_reason?.trim()) return;
+  async function changeStatus(appointment: Appointment, status: AppointmentStatus, statusReason?: string) {
+    setBusyId(appointment.id);
     setError("");
     try {
-      await appointmentsApi.update(id, { status: status as any, status_reason });
+      await appointmentsApi.update(appointment.id, { status, status_reason: statusReason });
+      setReasonTarget(null);
       load();
     } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "appointments.error"));
+      toast.error(apiErrorMessage(requestError, t, "appointments.error"));
+    } finally {
+      setBusyId(null);
     }
   }
 
-  function getPetName(id: number) {
-    return pets.find((p) => p.id === id)?.name ?? "—";
+  function petLabel(pet: Pet) {
+    return pet.owner_name ? `${pet.name} · ${pet.owner_name}` : pet.name;
   }
+
+  const petOptions = petSearch.withFound(pets);
+  const ownerOptions = ownerSearch.withFound(owners);
 
   const startLabel = new Date(filterStartDate + "T12:00:00Z").toLocaleDateString(
     "pt-AO",
@@ -222,6 +271,7 @@ export default function Appointments() {
   const filterLabel = filterStartDate === filterEndDate
     ? startLabel
     : t("appointments.dateRange.label", { start: startLabel, end: endLabel });
+  const multiDay = filterStartDate !== filterEndDate;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -285,43 +335,57 @@ export default function Appointments() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-dark-100">
-                  <TableHead className="pl-5 w-20">{t("appointments.table.time")}</TableHead>
+                  <TableHead className="pl-5 w-24">{t("appointments.table.time")}</TableHead>
                   <TableHead>{t("appointments.table.animal")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("appointments.table.vet")}</TableHead>
                   <TableHead>{t("appointments.table.reason")}</TableHead>
-                  <TableHead>{t("appointments.table.duration")}</TableHead>
                   <TableHead>{t("appointments.table.status")}</TableHead>
-                  <TableHead className="pr-5 w-48 text-right">{t("appointments.table.actions")}</TableHead>
+                  <TableHead className="pr-5 text-right">{t("appointments.table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {appointments.map((a) => {
                   const cfg = statusConfig(a.status);
+                  const scheduledAt = parseApiDate(a.scheduled_at);
+                  const busy = busyId === a.id;
                   return (
                     <TableRow key={a.id}>
                       <TableCell className="pl-5">
+                        {multiDay && (
+                          <div className="text-[11px] font-semibold uppercase text-dark-400">
+                            {scheduledAt.toLocaleDateString("pt-AO", { day: "2-digit", month: "short", timeZone: "Africa/Luanda" })}
+                          </div>
+                        )}
                         <div className="font-bold text-sm text-dark-900">
-                          {parseApiDate(a.scheduled_at).toLocaleTimeString("pt-AO", {
+                          {scheduledAt.toLocaleTimeString("pt-AO", {
                             hour: "2-digit",
                             minute: "2-digit",
                             timeZone: "Africa/Luanda",
                           })}
                         </div>
-                        <div className="text-dark-400 text-xs">{a.duration_min} min</div>
+                        <div className="text-dark-400 text-xs">{t("common.minutesShort", { count: a.duration_min })}</div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium text-sm text-dark-900">
-                          {getPetName(a.pet_id)}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Link to={`/pets/${a.pet_id}`} className="font-medium text-sm text-dark-900 hover:text-brand-700 hover:underline">
+                            {a.pet_name ?? pets.find((pet) => pet.id === a.pet_id)?.name ?? "—"}
+                          </Link>
+                          {a.subject_archived && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-dark-100 px-2 py-0.5 text-[11px] font-semibold text-dark-600">
+                              <Archive className="size-3" aria-hidden="true" />
+                              {t("common.archived")}
+                            </span>
+                          )}
+                        </div>
+                        {a.owner_name && <div className="text-xs text-dark-400">{a.owner_name}</div>}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <span className="text-sm text-dark-600">{a.vet_name ?? vets.find((vet) => vet.id === a.vet_id)?.name ?? "—"}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-dark-600">
-                          {a.notes || a.reason || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-dark-500">
-                          {a.duration_min} min
-                        </span>
+                        <div className="text-sm text-dark-700">{a.reason || "—"}</div>
+                        {a.notes && <div className="max-w-56 truncate text-xs text-dark-400" title={a.notes}>{a.notes}</div>}
+                        {a.status_reason && <div className="max-w-56 truncate text-xs text-dark-400" title={a.status_reason}>{a.status_reason}</div>}
                       </TableCell>
                       <TableCell>
                         <span
@@ -331,43 +395,78 @@ export default function Appointments() {
                             cfg.text
                           )}
                         >
-                          <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
+                          <span className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} aria-hidden="true" />
                           {t(`appointments.status.${cfg.key}`)}
                         </span>
                       </TableCell>
                       <TableCell className="pr-5">
-                        {a.status === "scheduled" ? (
-                          <div className="flex justify-end gap-2">
-                            {canWriteClinical && <button
-                              onClick={() => handleStatus(a.id, "in-progress")}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
-                              title={t("appointments.actions.start")}
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {a.status !== "cancelled" && a.status !== "no-show" && (
+                            <Link
+                              to={`/appointments/${a.id}/clinical`}
+                              className="inline-flex items-center gap-1 rounded-lg bg-dark-100 px-2.5 py-1 text-xs font-semibold text-dark-700 transition-colors hover:bg-dark-200"
                             >
-                              <Check className="w-3.5 h-3.5" />
-                              {t("appointments.actions.start")}
-                            </button>}
+                              <ClipboardList className="size-3.5" aria-hidden="true" />
+                              {t("appointments.actions.record")}
+                            </Link>
+                          )}
+                          {a.status === "scheduled" && (
+                            <>
+                              {canWriteClinical && !a.subject_archived && (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => changeStatus(a, "in-progress")}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors disabled:opacity-50"
+                                >
+                                  <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                                  {t("appointments.actions.start")}
+                                </button>
+                              )}
+                              {!a.subject_archived && (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => openReschedule(a)}
+                                  className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                                  aria-label={t("appointments.actions.reschedule")}
+                                  title={t("appointments.actions.reschedule")}
+                                >
+                                  <CalendarClock className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setReasonTarget({ appointment: a, status: "cancelled" })}
+                                className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+                                aria-label={t("appointments.actions.cancel")}
+                                title={t("appointments.actions.cancel")}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => setReasonTarget({ appointment: a, status: "no-show" })}
+                                className="px-2.5 py-1 rounded-lg bg-dark-100 text-dark-600 hover:bg-dark-200 text-xs font-semibold transition-colors disabled:opacity-50"
+                              >
+                                {t("appointments.actions.noShow")}
+                              </button>
+                            </>
+                          )}
+                          {a.status === "in-progress" && canWriteClinical && (
                             <button
-                              onClick={() => handleStatus(a.id, "cancelled")}
-                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                              title={t("appointments.actions.cancel")}
+                              type="button"
+                              disabled={busy}
+                              onClick={() => changeStatus(a, "completed")}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors disabled:opacity-50"
                             >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleStatus(a.id, "no-show")} className="px-2.5 py-1 rounded-lg bg-dark-100 text-dark-600 hover:bg-dark-200 text-xs font-semibold transition-colors">{t("appointments.actions.noShow")}</button>
-                          </div>
-                        ) : a.status === "in-progress" && canWriteClinical ? (
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => handleStatus(a.id, "completed")}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 text-xs font-semibold transition-colors"
-                            >
-                              <Check className="w-3.5 h-3.5" />
+                              <Check className="w-3.5 h-3.5" aria-hidden="true" />
                               {t("appointments.actions.complete")}
                             </button>
-                          </div>
-                        ) : (
-                          <span className="text-dark-300 text-xs">—</span>
-                        )}
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -378,74 +477,58 @@ export default function Appointments() {
         </CardContent>
       </Card>
 
-      {/* Form Dialog */}
-      {showForm && createPortal(
-        <div
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="flex shrink-0 items-center justify-between rounded-t-2xl border-b border-dark-100 bg-white px-6 py-4">
-              <div>
-                <h2 className="font-bold text-dark-900">{t("appointments.new")}</h2>
-                <p className="text-dark-400 text-xs mt-0.5">{t("appointments.create")}</p>
-              </div>
-              <button
-                onClick={() => setShowForm(false)}
-                className="w-8 h-8 rounded-xl bg-dark-100 flex items-center justify-center text-dark-400 hover:text-dark-700 hover:bg-dark-200 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+      <FormDialog
+        open={showForm}
+        onOpenChange={setShowForm}
+        title={t(editingAppointment ? "appointments.reschedule.title" : "appointments.new")}
+        description={editingAppointment
+          ? t("appointments.reschedule.hint", { name: editingAppointment.pet_name ?? "" })
+          : t("appointments.create")}
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 px-6 py-5">
+            <FormError message={formError} />
+            <div className="space-y-1.5">
+              <Label htmlFor="appointment-pet" className="text-xs font-semibold text-dark-600">{t("appointments.form.animal")} *</Label>
+              <FormSelect
+                id="appointment-pet"
+                value={form.pet_id || null}
+                onValueChange={handlePetSelection}
+                onSearchChange={petSearch.onSearchChange}
+                options={[
+                  ...(editingAppointment ? [] : [{
+                    value: CREATE_PET_VALUE,
+                    label: `+ ${t("appointments.form.createAnimal")}`,
+                    variant: "action" as const,
+                  }]),
+                  ...petOptions.map((pet) => ({ value: pet.id, label: petLabel(pet) })),
+                ]}
+                placeholder={t("appointments.form.selectAnimal")}
+                className="h-11 border-dark-200 bg-white"
+                ariaLabel={t("appointments.form.animal")}
+                required
+              />
             </div>
 
-            {/* Modal body */}
-            <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-              <FormError message={formError} />
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.animal")} *</Label>
-                <FormSelect
-                  value={form.pet_id || null}
-                  onValueChange={handlePetSelection}
-                  options={[
-                    {
-                      value: CREATE_PET_VALUE,
-                      label: (
-                        <span className="flex items-center gap-2">
-                          <Plus className="size-4" />
-                          {t("appointments.form.createAnimal")}
-                        </span>
-                      ),
-                      variant: "action" as const,
-                    },
-                    ...pets.map((pet) => ({ value: pet.id, label: pet.name })),
-                  ]}
-                  placeholder={t("appointments.form.selectAnimal")}
-                  className="h-11 border-dark-200 bg-white"
-                  ariaLabel={t("appointments.form.animal")}
-                  required
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="appointment-vet" className="text-xs font-semibold text-dark-600">{t("appointments.form.vet")} *</Label>
+              <FormSelect
+                id="appointment-vet"
+                value={form.vet_id || null}
+                onValueChange={(value) => setForm({ ...form, vet_id: Number(value) })}
+                options={vets.map((vet) => ({ value: vet.id, label: vet.name }))}
+                placeholder={t("appointments.form.selectVet")}
+                className="h-11 border-dark-200 bg-white"
+                ariaLabel={t("appointments.form.vet")}
+                required
+              />
+            </div>
 
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.vet")} *</Label>
-                <FormSelect
-                  value={form.vet_id || null}
-                  onValueChange={(value) => setForm({ ...form, vet_id: Number(value) })}
-                  options={vets.map((vet) => ({ value: vet.id, label: vet.name }))}
-                  placeholder={t("appointments.form.selectVet")}
-                  className="h-11 border-dark-200 bg-white"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.dateTime")} *</Label>
+                <Label htmlFor="appointment-datetime" className="text-xs font-semibold text-dark-600">{t("appointments.form.dateTime")} *</Label>
                 <Input
+                  id="appointment-datetime"
                   type="datetime-local"
                   value={form.scheduled_at}
                   onChange={(e) => setForm({ ...form, scheduled_at: e.target.value })}
@@ -453,274 +536,221 @@ export default function Appointments() {
                   className="h-11 rounded-xl"
                 />
               </div>
-
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.reason")}</Label>
-                <Input
-                  value={form.reason}
-                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                  placeholder={t("appointments.form.reasonPlaceholder")}
-                  className="h-11 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.service")}</Label>
+                <Label htmlFor="appointment-duration" className="text-xs font-semibold text-dark-600">{t("appointments.form.duration")}</Label>
                 <FormSelect
-                  value={form.service_type_id ?? ""}
-                  onValueChange={(value) => setForm({ ...form, service_type_id: value ? Number(value) : undefined })}
-                  options={[
-                    { value: "", label: t("appointments.form.selectService") },
-                    ...serviceTypes.filter((service) => service.active).map((service) => ({ value: service.id, label: service.name })),
-                  ]}
-                  placeholder={t("appointments.form.selectService")}
+                  id="appointment-duration"
+                  value={form.duration_min}
+                  onValueChange={(value) => setForm({ ...form, duration_min: Number(value) })}
+                  options={DURATION_OPTIONS.map((minutes) => ({ value: minutes, label: t("form.minutes", { count: minutes }) }))}
                   className="h-11 border-dark-200 bg-white"
+                  ariaLabel={t("appointments.form.duration")}
                 />
               </div>
+            </div>
 
+            <div className="space-y-1.5">
+              <Label htmlFor="appointment-service" className="text-xs font-semibold text-dark-600">{t("appointments.form.service")}</Label>
+              <FormSelect
+                id="appointment-service"
+                value={form.service_type_id ?? ""}
+                onValueChange={(value) => setForm({ ...form, service_type_id: value ? Number(value) : undefined })}
+                options={[
+                  { value: "", label: t("appointments.form.selectService") },
+                  ...serviceTypes.filter((service) => service.active).map((service) => ({ value: service.id, label: service.name })),
+                ]}
+                placeholder={t("appointments.form.selectService")}
+                className="h-11 border-dark-200 bg-white"
+                ariaLabel={t("appointments.form.service")}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="appointment-reason" className="text-xs font-semibold text-dark-600">{t("appointments.form.reason")}</Label>
+              <Input
+                id="appointment-reason"
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                placeholder={t("appointments.form.reasonPlaceholder")}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="appointment-notes" className="text-xs font-semibold text-dark-600">{t("appointments.form.notes")}</Label>
+              <Input
+                id="appointment-notes"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder={t("appointments.form.notesPlaceholder")}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            {canWriteClinical && !editingAppointment && (
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.notes")}</Label>
+                <Label htmlFor="appointment-weight" className="text-xs font-semibold text-dark-600">{t("appointments.form.weight")}</Label>
                 <Input
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder={t("appointments.form.notesPlaceholder")}
+                  id="appointment-weight"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={form.weight ?? ""}
+                  onChange={(e) =>
+                    setForm({ ...form, weight: e.target.value ? Number(e.target.value) : undefined })
+                  }
+                  placeholder={t("appointments.form.weightPlaceholder")}
                   className="h-11 rounded-xl"
                 />
               </div>
+            )}
+          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.duration")}</Label>
-                  <FormSelect
-                    value={form.duration_min}
-                    onValueChange={(value) => setForm({ ...form, duration_min: Number(value) })}
-                    options={[15, 30, 45, 60, 90].map((minutes) => ({ value: minutes, label: `${minutes} minutos` }))}
-                    className="h-11 border-dark-200 bg-white"
-                  />
-                </div>
-                {canWriteClinical && <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">{t("appointments.form.weight")}</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={form.weight ?? ""}
-                    onChange={(e) =>
-                      setForm({ ...form, weight: e.target.value ? Number(e.target.value) : undefined })
-                    }
-                    placeholder={t("appointments.form.weightPlaceholder")}
-                    className="h-11 rounded-xl"
-                  />
-                </div>}
-              </div>
-              </div>
+          <div className="flex items-center justify-end gap-3 border-t border-dark-100 px-6 py-4">
+            <Button type="button" variant="outline" onClick={() => setShowForm(false)} className="rounded-xl h-11">
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={saving} className="bg-brand-600 hover:bg-brand-700 rounded-xl h-11 font-semibold">
+              {saving
+                ? t("appointments.saving")
+                : t(editingAppointment ? "appointments.reschedule.save" : "appointments.create")}
+            </Button>
+          </div>
+        </form>
+      </FormDialog>
 
-              {/* Modal footer */}
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-dark-100 bg-white px-6 py-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowForm(false)}
-                  className="rounded-xl h-11"
-                >
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  className="bg-brand-600 hover:bg-brand-700 rounded-xl h-11 font-semibold"
-                >
-                  {saving ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      {t("appointments.saving")}
-                    </span>
-                  ) : t("appointments.create")}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
-      {showQuickPet && createPortal(
-        <div
-          className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-black/45 p-4 backdrop-blur-sm"
-          onClick={() => setShowQuickPet(false)}
-        >
-          <div
-            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-dark-100 px-6 py-4">
-              <div>
-                <h2 className="font-bold text-dark-900">{t("appointments.quickPet.title")}</h2>
-                <p className="mt-0.5 text-xs text-dark-400">{t("appointments.quickPet.hint")}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowQuickPet(false)}
-                aria-label={t("common.close")}
-                className="flex size-8 items-center justify-center rounded-xl bg-dark-100 text-dark-400 transition-colors hover:bg-dark-200 hover:text-dark-700"
-              >
-                <X className="size-4" />
-              </button>
+      <FormDialog
+        open={showQuickPet}
+        onOpenChange={setShowQuickPet}
+        title={t("appointments.quickPet.title")}
+        description={t("appointments.quickPet.hint")}
+      >
+        <form onSubmit={handleQuickPetSubmit}>
+          <div className="space-y-4 px-6 py-5">
+            <FormError message={petError} />
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-pet-owner" className="text-xs font-semibold text-dark-600">{t("pets.form.owner")} *</Label>
+              <FormSelect
+                id="quick-pet-owner"
+                value={petForm.owner_id || null}
+                onValueChange={handleOwnerSelection}
+                onSearchChange={ownerSearch.onSearchChange}
+                options={[
+                  {
+                    value: CREATE_OWNER_VALUE,
+                    label: `+ ${t("appointments.quickPet.createOwner")}`,
+                    variant: "action" as const,
+                  },
+                  ...ownerOptions.map((owner) => ({ value: owner.id, label: owner.phone ? `${owner.name} · ${owner.phone}` : owner.name })),
+                ]}
+                placeholder={t("pets.form.selectOwner")}
+                className="h-11 border-dark-200 bg-white"
+                ariaLabel={t("pets.form.owner")}
+                required
+              />
+              {ownerOptions.length === 0 && (
+                <p className="text-xs text-amber-700">{t("appointments.quickPet.noOwners")}</p>
+              )}
             </div>
-            <form onSubmit={handleQuickPetSubmit}>
-              <div className="space-y-4 px-6 py-5">
-                {petError && (
-                  <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    {petError}
-                  </div>
-                )}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.owner")} *</Label>
-                  <FormSelect
-                    value={petForm.owner_id || null}
-                    onValueChange={handleOwnerSelection}
-                    options={[
-                      {
-                        value: CREATE_OWNER_VALUE,
-                        label: (
-                          <span className="flex items-center gap-2">
-                            <Plus className="size-4" />
-                            {t("appointments.quickPet.createOwner")}
-                          </span>
-                        ),
-                        variant: "action" as const,
-                      },
-                      ...owners.map((owner) => ({ value: owner.id, label: owner.name })),
-                    ]}
-                    placeholder={t("pets.form.selectOwner")}
-                    className="h-11 border-dark-200 bg-white"
-                    ariaLabel={t("pets.form.owner")}
-                    required
-                  />
-                  {owners.length === 0 && (
-                    <p className="text-xs text-amber-700">{t("appointments.quickPet.noOwners")}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="quick-pet-name" className="text-xs font-semibold text-dark-600">{t("pets.form.name")} *</Label>
-                  <Input
-                    id="quick-pet-name"
-                    value={petForm.name}
-                    onChange={(event) => setPetForm({ ...petForm, name: event.target.value })}
-                    placeholder={t("pets.form.namePlaceholder")}
-                    className="h-11 rounded-xl"
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.species")} *</Label>
-                  <FormSelect
-                    value={petForm.species}
-                    onValueChange={(value) => setPetForm({ ...petForm, species: value })}
-                    options={PET_SPECIES.map((species) => ({ value: species, label: t(`pets.species.${species}`) }))}
-                    className="h-11 border-dark-200 bg-white"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-end gap-3 border-t border-dark-100 px-6 py-4">
-                <Button type="button" variant="outline" onClick={() => setShowQuickPet(false)} className="h-11 rounded-xl">
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={savingPet || owners.length === 0}
-                  className="h-11 rounded-xl bg-brand-600 font-semibold hover:bg-brand-700"
-                >
-                  {savingPet ? t("common.saving") : t("appointments.quickPet.create")}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body,
-      )}
-      {showQuickOwner && createPortal(
-        <div
-          className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-black/45 p-4 backdrop-blur-sm"
-          onClick={() => setShowQuickOwner(false)}
-        >
-          <div
-            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-dark-100 px-6 py-4">
-              <div>
-                <h2 className="font-bold text-dark-900">{t("appointments.quickOwner.title")}</h2>
-                <p className="mt-0.5 text-xs text-dark-400">{t("appointments.quickOwner.hint")}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowQuickOwner(false)}
-                aria-label={t("common.close")}
-                className="flex size-8 items-center justify-center rounded-xl bg-dark-100 text-dark-400 transition-colors hover:bg-dark-200 hover:text-dark-700"
-              >
-                <X className="size-4" />
-              </button>
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-pet-name" className="text-xs font-semibold text-dark-600">{t("pets.form.name")} *</Label>
+              <Input
+                id="quick-pet-name"
+                value={petForm.name}
+                onChange={(event) => setPetForm({ ...petForm, name: event.target.value })}
+                placeholder={t("pets.form.namePlaceholder")}
+                className="h-11 rounded-xl"
+                required
+              />
             </div>
-            <form onSubmit={handleQuickOwnerSubmit}>
-              <div className="space-y-4 px-6 py-5">
-                {ownerError && (
-                  <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                    {ownerError}
-                  </div>
-                )}
-                <div className="space-y-1.5">
-                  <Label htmlFor="quick-owner-name" className="text-xs font-semibold text-dark-600">{t("owners.form.name")} *</Label>
-                  <Input
-                    id="quick-owner-name"
-                    value={ownerForm.name}
-                    onChange={(event) => setOwnerForm({ ...ownerForm, name: event.target.value })}
-                    className="h-11 rounded-xl"
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="quick-owner-phone" className="text-xs font-semibold text-dark-600">{t("owners.form.phone")}</Label>
-                  <Input
-                    id="quick-owner-phone"
-                    type="tel"
-                    value={ownerForm.phone}
-                    onChange={(event) => setOwnerForm({ ...ownerForm, phone: event.target.value })}
-                    placeholder={t("owners.form.phonePlaceholder")}
-                    className="h-11 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="quick-owner-email" className="text-xs font-semibold text-dark-600">{t("owners.form.email")}</Label>
-                  <Input
-                    id="quick-owner-email"
-                    type="email"
-                    value={ownerForm.email}
-                    onChange={(event) => setOwnerForm({ ...ownerForm, email: event.target.value })}
-                    placeholder={t("owners.form.emailPlaceholder")}
-                    className="h-11 rounded-xl"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-end gap-3 border-t border-dark-100 px-6 py-4">
-                <Button type="button" variant="outline" onClick={() => setShowQuickOwner(false)} className="h-11 rounded-xl">
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={savingOwner}
-                  className="h-11 rounded-xl bg-brand-600 font-semibold hover:bg-brand-700"
-                >
-                  {savingOwner ? t("common.saving") : t("appointments.quickOwner.create")}
-                </Button>
-              </div>
-            </form>
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-pet-species" className="text-xs font-semibold text-dark-600">{t("pets.form.species")} *</Label>
+              <FormSelect
+                id="quick-pet-species"
+                value={petForm.species}
+                onValueChange={(value) => setPetForm({ ...petForm, species: value })}
+                options={PET_SPECIES.map((species) => ({ value: species, label: t(`pets.species.${species}`) }))}
+                className="h-11 border-dark-200 bg-white"
+                ariaLabel={t("pets.form.species")}
+                required
+              />
+            </div>
           </div>
-        </div>,
-        document.body,
-      )}
+          <div className="flex items-center justify-end gap-3 border-t border-dark-100 px-6 py-4">
+            <Button type="button" variant="outline" onClick={() => setShowQuickPet(false)} className="h-11 rounded-xl">
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={savingPet} className="h-11 rounded-xl bg-brand-600 font-semibold hover:bg-brand-700">
+              {savingPet ? t("common.saving") : t("appointments.quickPet.create")}
+            </Button>
+          </div>
+        </form>
+      </FormDialog>
+
+      <FormDialog
+        open={showQuickOwner}
+        onOpenChange={setShowQuickOwner}
+        title={t("appointments.quickOwner.title")}
+        description={t("appointments.quickOwner.hint")}
+      >
+        <form onSubmit={handleQuickOwnerSubmit}>
+          <div className="space-y-4 px-6 py-5">
+            <FormError message={ownerError} />
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-owner-name" className="text-xs font-semibold text-dark-600">{t("owners.form.name")} *</Label>
+              <Input
+                id="quick-owner-name"
+                value={ownerForm.name}
+                onChange={(event) => setOwnerForm({ ...ownerForm, name: event.target.value })}
+                className="h-11 rounded-xl"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-owner-phone" className="text-xs font-semibold text-dark-600">{t("owners.form.phone")}</Label>
+              <Input
+                id="quick-owner-phone"
+                type="tel"
+                value={ownerForm.phone}
+                onChange={(event) => setOwnerForm({ ...ownerForm, phone: event.target.value })}
+                placeholder={t("owners.form.phonePlaceholder")}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="quick-owner-email" className="text-xs font-semibold text-dark-600">{t("owners.form.email")}</Label>
+              <Input
+                id="quick-owner-email"
+                type="email"
+                value={ownerForm.email}
+                onChange={(event) => setOwnerForm({ ...ownerForm, email: event.target.value })}
+                placeholder={t("owners.form.emailPlaceholder")}
+                className="h-11 rounded-xl"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-3 border-t border-dark-100 px-6 py-4">
+            <Button type="button" variant="outline" onClick={() => setShowQuickOwner(false)} className="h-11 rounded-xl">
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={savingOwner} className="h-11 rounded-xl bg-brand-600 font-semibold hover:bg-brand-700">
+              {savingOwner ? t("common.saving") : t("appointments.quickOwner.create")}
+            </Button>
+          </div>
+        </form>
+      </FormDialog>
+
+      <PromptDialog
+        open={reasonTarget !== null}
+        onOpenChange={(open) => { if (!open) setReasonTarget(null); }}
+        title={t(reasonTarget?.status === "no-show" ? "appointments.noShowTitle" : "appointments.cancelTitle", { name: reasonTarget?.appointment.pet_name ?? "" })}
+        label={t(reasonTarget?.status === "no-show" ? "appointments.noShowReason" : "appointments.cancelReason")}
+        confirmLabel={t(reasonTarget?.status === "no-show" ? "appointments.actions.noShow" : "appointments.actions.cancel")}
+        cancelLabel={t("common.back")}
+        destructive
+        pending={reasonTarget !== null && busyId === reasonTarget.appointment.id}
+        onConfirm={(reason) => reasonTarget && changeStatus(reasonTarget.appointment, reasonTarget.status, reason)}
+      />
     </div>
   );
 }

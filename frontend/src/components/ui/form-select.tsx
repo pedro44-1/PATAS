@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import { ComboboxSelect } from "@/components/ui/combobox-select";
 import {
   Select,
   SelectContent,
@@ -27,7 +28,11 @@ interface FormSelectProps {
   name?: string;
   className?: string;
   ariaLabel?: string;
+  searchable?: boolean;
+  onSearchChange?: (query: string) => void;
 }
+
+const SEARCHABLE_THRESHOLD = 10;
 
 export function FormSelect({
   value,
@@ -40,12 +45,34 @@ export function FormSelect({
   name,
   className,
   ariaLabel,
+  searchable,
+  onSearchChange,
 }: FormSelectProps) {
   const normalizedOptions = options.map((option) => ({
     ...option,
     value: String(option.value),
   }));
   const normalizedValue = value === null || value === undefined ? null : String(value);
+  const textOptions = normalizedOptions.every((option) => typeof option.label === "string");
+  const useSearch = textOptions && (searchable ?? (Boolean(onSearchChange) || normalizedOptions.length > SEARCHABLE_THRESHOLD));
+
+  if (useSearch) {
+    return (
+      <ComboboxSelect
+        value={normalizedValue}
+        onValueChange={onValueChange}
+        items={normalizedOptions.map((option) => ({ ...option, label: option.label as string }))}
+        placeholder={placeholder}
+        disabled={disabled}
+        required={required}
+        id={id}
+        name={name}
+        className={className}
+        ariaLabel={ariaLabel}
+        onSearchChange={onSearchChange}
+      />
+    );
+  }
 
   return (
     <Select

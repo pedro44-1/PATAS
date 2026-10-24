@@ -1,6 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { apiErrorMessage } from "@/api/errors";
+import { PromptDialog } from "@/components/ui/prompt-dialog";
+import { useToast } from "@/contexts/ToastContext";
 import { Appointment, appointmentsApi } from "@/api/appointments";
 import {
   clinicalApi,
@@ -119,6 +122,8 @@ export default function ClinicalHistory({
   const [vaccineForm, setVaccineForm] = useState<VaccinationCreate>(emptyVaccination());
   const [medicationForm, setMedicationForm] = useState<MedicationCreate>(emptyMedication());
   const [saving, setSaving] = useState(false);
+  const [voidTarget, setVoidTarget] = useState<{ kind: RecordKind; id: number; name: string } | null>(null);
+  const toast = useToast();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -185,8 +190,8 @@ export default function ClinicalHistory({
         : [response.data, ...vaccinations];
       onRecordsChange(next, medications);
       closeForm();
-    } catch {
-      window.alert(t("clinical.errors.save"));
+    } catch (requestError: unknown) {
+      toast.error(apiErrorMessage(requestError, t, "clinical.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -204,16 +209,15 @@ export default function ClinicalHistory({
         : [response.data, ...medications];
       onRecordsChange(vaccinations, next);
       closeForm();
-    } catch {
-      window.alert(t("clinical.errors.save"));
+    } catch (requestError: unknown) {
+      toast.error(apiErrorMessage(requestError, t, "clinical.errors.save"));
     } finally {
       setSaving(false);
     }
   }
 
-  async function voidRecord(kind: RecordKind, id: number) {
-    const reason = window.prompt(t("clinical.actions.voidPrompt"));
-    if (!reason?.trim()) return;
+  async function voidRecord(kind: RecordKind, id: number, reason: string) {
+    setSaving(true);
     try {
       if (kind === "vaccination") {
         const response = await clinicalApi.voidVaccination(id, { reason });
@@ -222,8 +226,11 @@ export default function ClinicalHistory({
         const response = await clinicalApi.voidMedication(id, { reason });
         onRecordsChange(vaccinations, medications.map((item) => item.id === id ? response.data : item));
       }
-    } catch {
-      window.alert(t("clinical.errors.void"));
+      setVoidTarget(null);
+    } catch (requestError: unknown) {
+      toast.error(apiErrorMessage(requestError, t, "clinical.errors.void"));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -231,8 +238,8 @@ export default function ClinicalHistory({
     try {
       const response = await clinicalApi.updateMedication(record.id, { status });
       onRecordsChange(vaccinations, medications.map((item) => item.id === record.id ? response.data : item));
-    } catch {
-      window.alert(t("clinical.errors.save"));
+    } catch (requestError: unknown) {
+      toast.error(apiErrorMessage(requestError, t, "clinical.errors.save"));
     }
   }
 
@@ -393,6 +400,17 @@ export default function ClinicalHistory({
 
   return (
     <div className="space-y-4">
+      <PromptDialog
+        open={voidTarget !== null}
+        onOpenChange={(open) => { if (!open) setVoidTarget(null); }}
+        title={t("clinical.actions.voidTitle", { name: voidTarget?.name ?? "" })}
+        label={t("clinical.actions.voidPrompt")}
+        confirmLabel={t("clinical.actions.void")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        pending={saving}
+        onConfirm={(reason) => voidTarget && voidRecord(voidTarget.kind, voidTarget.id, reason)}
+      />
       {activeTab === "timeline" && (
         <Card>
           <CardHeader><CardTitle>{t("clinical.timeline.title")}</CardTitle></CardHeader>
@@ -410,7 +428,7 @@ export default function ClinicalHistory({
         <RecordCard title={t("clinical.vaccinations.title")} count={vaccinations.filter((item) => item.status !== "voided").length} action={canWrite ? <Button onClick={() => startVaccination()}><Plus />{t("clinical.vaccinations.new")}</Button> : undefined}>
           {recordKind === "vaccination" && renderVaccineForm()}
           {vaccinations.length === 0 ? <EmptyState icon={Syringe} text={t("clinical.vaccinations.empty")} /> : <RecordTable>
-            {vaccinations.map((item) => <RecordRow key={item.id} icon={Syringe} title={item.name} date={item.administered_at} detail={[item.dose, item.lot_number].filter(Boolean).join(" · ")} status={item.status} statusLabel={t(`clinical.status.${item.status}`)} actions={canWrite && item.status !== "voided" ? <><Button size="sm" variant="ghost" onClick={() => startVaccination(item)}><Edit3 />{t("common.edit")}</Button><Button size="sm" variant="ghost" onClick={() => voidRecord("vaccination", item.id)}><X />{t("clinical.actions.void")}</Button></> : undefined} />)}
+            {vaccinations.map((item) => <RecordRow key={item.id} icon={Syringe} title={item.name} date={item.administered_at} detail={[item.dose, item.lot_number].filter(Boolean).join(" · ")} status={item.status} statusLabel={t(`clinical.status.${item.status}`)} actions={canWrite && item.status !== "voided" ? <><Button size="sm" variant="ghost" onClick={() => startVaccination(item)}><Edit3 />{t("common.edit")}</Button><Button size="sm" variant="ghost" onClick={() => setVoidTarget({ kind: "vaccination", id: item.id, name: item.name })}><X />{t("clinical.actions.void")}</Button></> : undefined} />)}
           </RecordTable>}
         </RecordCard>
       )}
@@ -419,7 +437,7 @@ export default function ClinicalHistory({
         <RecordCard title={t("clinical.medications.title")} count={medications.filter((item) => item.status !== "voided").length} action={canWrite ? <Button onClick={() => startMedication()}><Plus />{t("clinical.medications.new")}</Button> : undefined}>
           {recordKind === "medication" && renderMedicationForm()}
           {medications.length === 0 ? <EmptyState icon={Pill} text={t("clinical.medications.empty")} /> : <RecordTable>
-            {medications.map((item) => <RecordRow key={item.id} icon={Pill} title={item.name} date={item.start_date} detail={[item.dosage, item.frequency, item.route].filter(Boolean).join(" · ")} status={item.status} statusLabel={t(`clinical.status.${item.status}`)} actions={canWrite && item.status !== "voided" ? <><Button size="sm" variant="ghost" onClick={() => startMedication(item)}><Edit3 />{t("common.edit")}</Button>{item.status === "active" && <><Button size="sm" variant="ghost" onClick={() => updateMedicationStatus(item, "completed")}><Check />{t("clinical.actions.complete")}</Button><Button size="sm" variant="ghost" onClick={() => updateMedicationStatus(item, "cancelled")}><X />{t("clinical.actions.cancel")}</Button></>}<Button size="sm" variant="ghost" onClick={() => voidRecord("medication", item.id)}><X />{t("clinical.actions.void")}</Button></> : undefined} />)}
+            {medications.map((item) => <RecordRow key={item.id} icon={Pill} title={item.name} date={item.start_date} detail={[item.dosage, item.frequency, item.route].filter(Boolean).join(" · ")} status={item.status} statusLabel={t(`clinical.status.${item.status}`)} actions={canWrite && item.status !== "voided" ? <><Button size="sm" variant="ghost" onClick={() => startMedication(item)}><Edit3 />{t("common.edit")}</Button>{item.status === "active" && <><Button size="sm" variant="ghost" onClick={() => updateMedicationStatus(item, "completed")}><Check />{t("clinical.actions.complete")}</Button><Button size="sm" variant="ghost" onClick={() => updateMedicationStatus(item, "cancelled")}><X />{t("clinical.actions.cancel")}</Button></>}<Button size="sm" variant="ghost" onClick={() => setVoidTarget({ kind: "medication", id: item.id, name: item.name })}><X />{t("clinical.actions.void")}</Button></> : undefined} />)}
           </RecordTable>}
         </RecordCard>
       )}

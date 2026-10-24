@@ -19,6 +19,7 @@ Shared components own reusable presentation and interaction primitives. Pages an
 - Brand components own only shared visual identity; use locale keys for their visible copy.
 - Mobile presentation is selected with CSS breakpoints, never by duplicating routes or detecting a device in application logic.
 - The authenticated shell exposes the frequent clinical routes through the mobile bottom navigation; secondary routes remain in the drawer.
+- `RoleRoute` guards role-restricted routes (`/users` admin, `/treatments` admin/vet) and `Layout` hides navigation entries the role cannot open; unknown routes render `pages/NotFound.tsx`.
 - Protected routes redirect forced temporary-password sessions to password change before rendering the authenticated shell.
 
 ## Work Guidance

@@ -8,6 +8,7 @@ import { Treatment } from "@/api/treatments";
 import { Medication, Vaccination } from "@/api/clinical";
 import { invoicesApi, Invoice } from "@/api/invoices";
 import { OPTIONS_LIMIT } from "@/api/pagination";
+import { formatKz } from "@/lib/format";
 import { useAuth } from "@/contexts/AuthContext";
 import ClinicalHistory from "@/features/pets/ClinicalHistory";
 import { Card, CardContent } from "@/components/ui/card";
@@ -609,12 +610,13 @@ export default function PetDetail() {
                     const cfg = invStatusConfig(inv.status);
                     return (
                       <TableRow key={inv.id}>
-                        <TableCell className="pl-5 font-bold text-sm text-dark-500">#{inv.id}</TableCell>
+                        <TableCell className="pl-5 font-bold text-sm text-dark-500">{inv.document_number ?? `#${inv.id}`}</TableCell>
                         <TableCell>
-                          <span className="text-sm text-dark-600">{inv.description ?? "—"}</span>
+                          <span className="text-sm text-dark-600">{inv.items?.[0]?.description ?? inv.description ?? "—"}</span>
+                          {inv.appointment_id === null && <span className="ml-2 rounded-full bg-dark-100 px-2 py-0.5 text-[11px] font-semibold text-dark-500">{t("pets.detail.invoices.ownerLevel")}</span>}
                         </TableCell>
                         <TableCell>
-                          <span className="font-bold text-sm text-dark-900">{inv.amount.toLocaleString("pt-AO")} Kz</span>
+                          <span className="font-bold text-sm text-dark-900 tabular-nums">{formatKz(inv.quote_payable ?? inv.amount)}</span>
                         </TableCell>
                         <TableCell>
                           <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold", cfg.bg, cfg.text)}>

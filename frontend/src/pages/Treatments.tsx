@@ -3,6 +3,7 @@ import { apiErrorMessage } from "@/api/errors";
 import { OPTIONS_LIMIT } from "@/api/pagination";
 import { FormError } from "@/components/ui/form-error";
 import { useTranslation } from "react-i18next";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { treatmentsApi, Treatment, TreatmentCreate } from "@/api/treatments";
 import { appointmentsApi, Appointment, AppointmentCreate, VetOption } from "@/api/appointments";
 import { petsApi, Pet } from "@/api/pets";
@@ -115,7 +116,8 @@ export default function Treatments() {
   function getApptInfo(id: number) {
     const appointment = appointments.find((item) => item.id === id);
     if (!appointment) return "—";
-    return `${appointment.notes || appointment.reason || t("treatments.appointmentFallback")} · ${parseApiDate(appointment.scheduled_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" })}`;
+    const date = parseApiDate(appointment.scheduled_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" });
+    return [date, appointment.pet_name, appointment.reason || t("treatments.appointmentFallback")].filter(Boolean).join(" · ");
   }
 
   function closeTreatmentForm() {
@@ -128,7 +130,7 @@ export default function Treatments() {
   function openCreate() {
     setEditing(null);
     setForm({
-      appointment_id: appointments[0]?.id ?? 0,
+      appointment_id: 0,
       diagnosis: "",
       notes: "",
       prescription: "",
@@ -153,6 +155,10 @@ export default function Treatments() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (!form.appointment_id) {
+      setFormError(t("treatments.form.appointmentRequired"));
+      return;
+    }
     setSaving(true);
     setFormError("");
     try {
@@ -181,8 +187,8 @@ export default function Treatments() {
         setPets(petsResponse.data);
         setVets(vetsResponse.data);
         setAppointmentForm({
-          pet_id: petsResponse.data[0]?.id ?? 0,
-          vet_id: vetsResponse.data[0]?.id ?? 0,
+          pet_id: 0,
+          vet_id: user?.role === "vet" ? user.id : 0,
           scheduled_at: defaultAppointmentDateTime(),
           duration_min: 30,
           reason: "",
@@ -194,6 +200,10 @@ export default function Treatments() {
 
   async function handleAppointmentSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (!appointmentForm.pet_id || !appointmentForm.vet_id) {
+      setAppointmentFormError(t(!appointmentForm.pet_id ? "appointments.form.animalRequired" : "appointments.form.vetRequired"));
+      return;
+    }
     setAppointmentSaving(true);
     setAppointmentFormError("");
     try {
@@ -363,26 +373,12 @@ export default function Treatments() {
         </CardContent>
       </Card>
 
-      {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/60 p-4 backdrop-blur-sm" onClick={closeTreatmentForm}>
-          <div
-            className="absolute left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-full max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b border-dark-100 bg-white px-6 py-4">
-              <div>
-                <h2 className="font-bold text-dark-900">{t(editing ? "treatments.edit" : "treatments.new")}</h2>
-                <p className="mt-0.5 text-xs text-dark-400">{t(editing ? "treatments.editHint" : "treatments.createHint")}</p>
-              </div>
-              <button
-                onClick={closeTreatmentForm}
-                className="flex h-8 w-8 items-center justify-center rounded-xl bg-dark-100 text-dark-400 transition-colors hover:bg-dark-200 hover:text-dark-700"
-                aria-label={t("common.cancel")}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
+      <FormDialog
+        open={showForm}
+        onOpenChange={(open) => { if (!open) closeTreatmentForm(); }}
+        title={t(editing ? "treatments.edit" : "treatments.new")}
+        description={t(editing ? "treatments.editHint" : "treatments.createHint")}
+      >
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <FormError message={formError} />
               {editingCompleted && (
@@ -407,8 +403,9 @@ export default function Treatments() {
                 <FormSelect
                   value={form.appointment_id || null}
                   onValueChange={(value) => setForm({ ...form, appointment_id: Number(value) })}
-                  options={appointments.map((appointment) => ({ value: appointment.id, label: getApptInfo(appointment.id) }))}
+                  options={appointments.filter((appointment) => appointment.status !== "cancelled" && appointment.status !== "no-show").map((appointment) => ({ value: appointment.id, label: getApptInfo(appointment.id) }))}
                   placeholder={t("treatments.form.selectAppointment")}
+                  ariaLabel={t("treatments.form.appointment")}
                   className="h-11 border-dark-200 bg-white"
                   required
                 />
@@ -454,30 +451,14 @@ export default function Treatments() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </FormDialog>
 
-      {showAppointmentForm && (
-        <div className="fixed inset-0 z-[60] bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowAppointmentForm(false)}>
-          <div
-            className="absolute left-1/2 top-1/2 max-h-[calc(100dvh-2rem)] w-full max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b border-dark-100 bg-white px-6 py-4">
-              <div>
-                <h2 className="font-bold text-dark-900">{t("treatments.newAppointment.title")}</h2>
-                <p className="mt-0.5 text-xs text-dark-400">{t("treatments.newAppointment.hint")}</p>
-              </div>
-              <button
-                onClick={() => setShowAppointmentForm(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-xl bg-dark-100 text-dark-400 transition-colors hover:bg-dark-200 hover:text-dark-700"
-                aria-label={t("common.cancel")}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
+      <FormDialog
+        open={showAppointmentForm}
+        onOpenChange={setShowAppointmentForm}
+        title={t("treatments.newAppointment.title")}
+        description={t("treatments.newAppointment.hint")}
+      >
             <form onSubmit={handleAppointmentSubmit} className="space-y-4 p-6">
               <FormError message={appointmentFormError} />
               <div className="space-y-1.5">
@@ -485,8 +466,9 @@ export default function Treatments() {
                 <FormSelect
                   value={appointmentForm.pet_id || null}
                   onValueChange={(value) => setAppointmentForm({ ...appointmentForm, pet_id: Number(value) })}
-                  options={pets.map((pet) => ({ value: pet.id, label: pet.name }))}
+                  options={pets.map((pet) => ({ value: pet.id, label: pet.owner_name ? `${pet.name} · ${pet.owner_name}` : pet.name }))}
                   placeholder={t("appointments.form.selectAnimal")}
+                  ariaLabel={t("appointments.form.animal")}
                   className="h-11 border-dark-200 bg-white"
                   disabled={appointmentOptionsLoading}
                   required
@@ -540,9 +522,7 @@ export default function Treatments() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </FormDialog>
     </div>
   );
 }

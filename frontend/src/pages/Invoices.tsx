@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { FormError } from "@/components/ui/form-error";
 import { useTranslation } from "react-i18next";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { PromptDialog } from "@/components/ui/prompt-dialog";
+import { useToast } from "@/contexts/ToastContext";
+import { parseApiDate } from "@/lib/date";
+import { useRemoteOptions } from "@/lib/use-remote-options";
 import { AlertTriangle, Calculator, CheckCircle2, ExternalLink, FileText, Plus, RotateCw, Search, Send, Trash2, X } from "lucide-react";
 
 import { appointmentsApi, Appointment } from "@/api/appointments";
@@ -55,6 +60,11 @@ export default function Invoices() {
   const [pendingCount, setPendingCount] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [emitTarget, setEmitTarget] = useState<Invoice | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Invoice | null>(null);
+  const [nifDraft, setNifDraft] = useState("");
+  const [savingNif, setSavingNif] = useState(false);
+  const ownerSearch = useRemoteOptions((query) => ownersApi.list({ q: query, limit: 50 }).then((response) => response.data));
+  const toast = useToast();
 
   function load() {
     setLoading(true);
@@ -89,7 +99,8 @@ export default function Invoices() {
       .catch((requestError: unknown) => setFormError(apiErrorMessage(requestError, t, "invoices.error")));
   }, [showForm, form.owner_id]);
 
-  const owner = owners.find((item) => item.id === form.owner_id);
+  const ownerOptions = ownerSearch.withFound(owners);
+  const owner = ownerOptions.find((item) => item.id === form.owner_id);
   const ownerAppointments = appointments.filter((item) => item.status !== "cancelled" && item.status !== "no-show");
   const subtotal = useMemo(
     () => form.items.reduce((result, item) => result + item.quantity * item.unit_price, 0),
@@ -98,7 +109,9 @@ export default function Invoices() {
   const pendingTotal = pendingInvoices.reduce((sum, item) => sum + Math.round(Number(item.quote_payable ?? item.amount) * 100), 0) / 100;
 
   function openCreate() {
-    setForm({ ...emptyForm(), owner_id: owners[0]?.id ?? 0 });
+    setForm(emptyForm());
+    setFormError("");
+    setNifDraft("");
     setShowForm(true);
   }
 
@@ -108,6 +121,10 @@ export default function Invoices() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (!form.owner_id) {
+      setFormError(t("invoices.form.ownerRequired"));
+      return;
+    }
     setSaving(true);
     setFormError("");
     try {
@@ -119,6 +136,7 @@ export default function Invoices() {
         items: form.items,
       });
       setShowForm(false);
+      toast.success(t("invoices.draftSaved"));
       load();
     } catch (requestError: unknown) {
       setFormError(apiErrorMessage(requestError, t, "invoices.error"));
@@ -141,10 +159,29 @@ export default function Invoices() {
     }
   }
 
-  function handleStatus(id: number, status: InvoiceStatus) {
-    const reason = status === "cancelled" ? window.prompt(t("invoices.cancelReason")) ?? "" : undefined;
-    if (status === "cancelled" && !reason?.trim()) return;
-    return runRowAction(id, () => invoicesApi.update(id, { status, reason }));
+  async function confirmCancel(reason: string) {
+    if (!cancelTarget) return;
+    const target = cancelTarget;
+    await runRowAction(target.id, () => invoicesApi.update(target.id, { status: "cancelled" as InvoiceStatus, reason }));
+    setCancelTarget(null);
+  }
+
+  async function saveOwnerNif() {
+    if (!owner || !nifDraft.trim()) return;
+    setSavingNif(true);
+    setFormError("");
+    try {
+      const response = await ownersApi.update(owner.id, { nif: nifDraft.trim() });
+      setOwners((current) => current.some((item) => item.id === owner.id)
+        ? current.map((item) => item.id === owner.id ? response.data : item)
+        : [response.data, ...current]);
+      setNifDraft("");
+      toast.success(t("invoices.form.nifSaved"));
+    } catch (requestError: unknown) {
+      setFormError(apiErrorMessage(requestError, t, "owners.error"));
+    } finally {
+      setSavingNif(false);
+    }
   }
 
   async function confirmEmission() {
@@ -184,7 +221,7 @@ export default function Invoices() {
           {invoice.status === "draft" && hasPendingEmission(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => setEmitTarget(invoice)}><RotateCw className="mr-1 size-3.5" />{t("invoices.actions.retry")}</Button>}
           {invoice.status === "draft" && !hasPendingEmission(invoice) && !hasValidQuote(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => handlePreview(invoice.id)}><Calculator className="mr-1 size-3.5" />{t("invoices.actions.preview")}</Button>}
           {invoice.status === "draft" && !hasPendingEmission(invoice) && hasValidQuote(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => setEmitTarget(invoice)}><Send className="mr-1 size-3.5" />{t("invoices.actions.send")}</Button>}
-          {invoice.status === "draft" && !hasPendingEmission(invoice) && <Button size="icon-sm" variant="ghost" disabled={busyId === invoice.id} onClick={() => handleStatus(invoice.id, "cancelled")} aria-label={t("invoices.actions.cancel")}><X className="size-4" /></Button>}
+          {invoice.status === "draft" && !hasPendingEmission(invoice) && <Button size="icon-sm" variant="ghost" disabled={busyId === invoice.id} onClick={() => setCancelTarget(invoice)} aria-label={t("invoices.actions.cancel")}><X className="size-4" /></Button>}
           {invoice.status === "sent" && invoice.external_reference && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => runRowAction(invoice.id, () => invoicesApi.reconcile(invoice.id), "invoices.reconcileError")}><CheckCircle2 className="mr-1 size-3.5" />{t("invoices.actions.checkPayment")}</Button>}
           {invoice.document_url && <a href={invoice.document_url} target="_blank" rel="noreferrer" aria-label={t("invoices.actions.openDocument")} className="inline-flex size-7 items-center justify-center rounded-lg text-dark-500 hover:bg-dark-100"><ExternalLink className="size-4" /></a>}
         </div></TableCell>
@@ -208,17 +245,16 @@ export default function Invoices() {
       </dl>}
     </ConfirmDialog>
 
-    {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowForm(false)}><div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-dark-100 bg-white px-6 py-4"><div><h2 className="font-bold text-dark-900">{t("invoices.new")}</h2><p className="mt-0.5 text-xs text-dark-400">{t("invoices.createHint")}</p></div><Button type="button" size="icon-sm" variant="ghost" onClick={() => setShowForm(false)}><X className="size-4" /></Button></div>
+    <FormDialog open={showForm} onOpenChange={setShowForm} size="2xl" title={t("invoices.new")} description={t("invoices.createHint")}>
       <form onSubmit={handleSubmit} className="space-y-6 p-6">
         <FormError message={formError} />
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="space-y-1.5"><Label>{t("invoices.form.owner")} *</Label><FormSelect value={form.owner_id || null} onValueChange={(value) => setForm((current) => ({ ...current, owner_id: Number(value), appointment_id: null }))} options={owners.map((item) => ({ value: item.id, label: item.nif ? `${item.name} · ${item.nif}` : item.name }))} placeholder={t("invoices.form.selectOwner")} required /></div>
-          <div className="space-y-1.5"><Label>{t("invoices.form.appointment")}</Label><FormSelect value={form.appointment_id} onValueChange={(value) => setForm((current) => ({ ...current, appointment_id: value ? Number(value) : null }))} options={[{ value: "", label: t("invoices.form.noAppointment") }, ...ownerAppointments.map((item) => ({ value: item.id, label: `${new Date(item.scheduled_at).toLocaleDateString("pt-AO")} · ${item.reason ?? t("appointments.title")}` }))]} /></div>
-          <div className="space-y-1.5"><Label>{t("invoices.form.documentType")}</Label><FormSelect value={form.document_type} onValueChange={(value) => setForm((current) => ({ ...current, document_type: value as "FT" | "FR" }))} options={[{ value: "FT", label: t("invoices.documentType.FT") }, { value: "FR", label: t("invoices.documentType.FR") }]} /></div>
-          {form.document_type === "FR" && <div className="space-y-1.5"><Label>{t("invoices.form.paymentMethod")}</Label><FormSelect value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as PaymentMethod }))} options={(["cash", "bank-transfer", "tpa"] as PaymentMethod[]).map((value) => ({ value, label: t(`invoices.paymentMethod.${value}`) }))} />{form.payment_method === "cash" && <p className="text-xs text-amber-700">{t("invoices.form.cashSessionHint")}</p>}</div>}
+          <div className="space-y-1.5 md:col-span-2"><Label htmlFor="invoice-owner">{t("invoices.form.owner")} *</Label><FormSelect id="invoice-owner" ariaLabel={t("invoices.form.owner")} value={form.owner_id || null} onValueChange={(value) => { setNifDraft(""); setForm((current) => ({ ...current, owner_id: Number(value), appointment_id: null })); }} onSearchChange={ownerSearch.onSearchChange} options={ownerOptions.map((item) => ({ value: item.id, label: item.nif ? `${item.name} · ${item.nif}` : item.name }))} placeholder={t("invoices.form.selectOwner")} required /></div>
+          <div className="space-y-1.5"><Label htmlFor="invoice-appointment">{t("invoices.form.appointment")}</Label><FormSelect id="invoice-appointment" ariaLabel={t("invoices.form.appointment")} value={form.appointment_id} onValueChange={(value) => setForm((current) => ({ ...current, appointment_id: value ? Number(value) : null }))} options={[{ value: "", label: t("invoices.form.noAppointment") }, ...ownerAppointments.map((item) => ({ value: item.id, label: `${parseApiDate(item.scheduled_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" })} · ${item.pet_name ?? ""} · ${item.reason || t("appointments.title")}` }))]} /></div>
+          <div className="space-y-1.5"><Label htmlFor="invoice-document-type">{t("invoices.form.documentType")}</Label><FormSelect id="invoice-document-type" ariaLabel={t("invoices.form.documentType")} value={form.document_type} onValueChange={(value) => setForm((current) => ({ ...current, document_type: value as "FT" | "FR" }))} options={[{ value: "FT", label: t("invoices.documentType.FT") }, { value: "FR", label: t("invoices.documentType.FR") }]} /></div>
+          {form.document_type === "FR" && <div className="space-y-1.5"><Label htmlFor="invoice-payment-method">{t("invoices.form.paymentMethod")}</Label><FormSelect id="invoice-payment-method" ariaLabel={t("invoices.form.paymentMethod")} value={form.payment_method} onValueChange={(value) => setForm((current) => ({ ...current, payment_method: value as PaymentMethod }))} options={(["cash", "bank-transfer", "tpa"] as PaymentMethod[]).map((value) => ({ value, label: t(`invoices.paymentMethod.${value}`) }))} />{form.payment_method === "cash" && <p className="text-xs text-amber-700">{t("invoices.form.cashSessionHint")}</p>}</div>}
         </div>
-        {owner && !owner.nif && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{t("invoices.form.missingNif")}</div>}
+        {owner && !owner.nif && <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"><p>{t("invoices.form.missingNif")}</p><div className="flex flex-wrap items-end gap-2"><div className="min-w-48 flex-1 space-y-1"><Label htmlFor="invoice-owner-nif" className="text-xs">{t("owners.form.nif")}</Label><Input id="invoice-owner-nif" value={nifDraft} maxLength={30} onChange={(event) => setNifDraft(event.target.value)} className="bg-white" /></div><Button type="button" variant="outline" disabled={savingNif || !nifDraft.trim()} onClick={saveOwnerNif}>{savingNif ? t("common.saving") : t("invoices.form.saveNif")}</Button></div></div>}
         <div className="space-y-3">
           <div className="flex items-center justify-between"><div><h3 className="font-bold text-dark-900">{t("invoices.form.items")}</h3><p className="text-xs text-dark-400">{t("invoices.form.itemsHint")}</p></div><Button type="button" size="sm" variant="outline" onClick={() => setForm((current) => ({ ...current, items: [...current.items, emptyLine()] }))}><Plus className="mr-1 size-3.5" />{t("invoices.form.addItem")}</Button></div>
           {form.items.map((item, index) => <div key={index} className="grid gap-3 rounded-xl border border-dark-100 bg-dark-50/50 p-4 md:grid-cols-2 lg:grid-cols-[110px_minmax(0,2fr)_80px_120px_140px_40px]">
@@ -227,12 +263,24 @@ export default function Invoices() {
             <div className="space-y-1"><Label>{t("invoices.form.quantity")}</Label><Input type="number" min="0.001" step="0.001" value={item.quantity} onChange={(event) => updateLine(index, { quantity: Number(event.target.value) })} required /></div>
             <div className="space-y-1"><Label>{t("invoices.form.unitPrice")}</Label><Input type="number" min="0" step="0.01" value={item.unit_price || ""} onChange={(event) => updateLine(index, { unit_price: Number(event.target.value) })} required /></div>
             <div className="space-y-1"><Label>{t("invoices.form.vatProfile")}</Label><Input value={item.vat_profile_code ?? ""} onChange={(event) => updateLine(index, { vat_profile_code: event.target.value || undefined })} placeholder={t("invoices.form.vatProfileDefault")} /></div>
-            <Button type="button" size="icon-sm" variant="ghost" className="mt-6" disabled={form.items.length === 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))}><Trash2 className="size-4" /></Button>
+            <Button type="button" size="icon-sm" variant="ghost" className="mt-6" aria-label={t("invoices.form.removeItem")} disabled={form.items.length === 1} onClick={() => setForm((current) => ({ ...current, items: current.items.filter((_, itemIndex) => itemIndex !== index) }))}><Trash2 className="size-4" /></Button>
           </div>)}
         </div>
         <div className="ml-auto w-full max-w-sm space-y-2 rounded-xl bg-dark-50 p-4 text-sm tabular-nums"><div className="flex justify-between text-lg"><span>{t("invoices.summary.commercialSubtotal")}</span><strong>{subtotal.toLocaleString("pt-AO")} Kz</strong></div><p className="text-xs text-dark-500">{t("invoices.summary.providerTotalHint")}</p></div>
         <div className="flex justify-end gap-3 border-t border-dark-100 pt-4"><Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button><Button type="submit" disabled={saving || !owner?.nif || subtotal < 0}>{saving ? t("invoices.savingDraft") : t("invoices.saveDraft")}</Button></div>
       </form>
-    </div></div>}
+    </FormDialog>
+
+    <PromptDialog
+      open={cancelTarget !== null}
+      onOpenChange={(open) => { if (!open) setCancelTarget(null); }}
+      title={t("invoices.cancelTitle")}
+      label={t("invoices.cancelReason")}
+      confirmLabel={t("invoices.actions.cancel")}
+      cancelLabel={t("common.back")}
+      destructive
+      pending={cancelTarget !== null && busyId === cancelTarget.id}
+      onConfirm={confirmCancel}
+    />
   </div>;
 }

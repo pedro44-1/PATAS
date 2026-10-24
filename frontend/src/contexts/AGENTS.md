@@ -14,6 +14,7 @@ Contexts own shared state lifecycle and provider contracts. API modules own HTTP
 - Clear session state on logout, invalid refresh, and unauthorized responses as defined by the client.
 - Do not store passwords or expose tokens through rendered UI.
 - Persist only current user and token material. Temporary passwords exist only in the create-user form/request and are never restored after submission.
+- `ToastContext` provides transient success/error feedback (`useToast`) for actions that do not keep a form open; form errors stay inline with `FormError`.
 - Enforce the forced-password route state from `must_change_password` before rendering other protected pages.
 
 ## Work Guidance

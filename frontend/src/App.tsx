@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ToastProvider } from "./contexts/ToastContext";
+import RoleRoute from "./components/RoleRoute";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 
@@ -19,6 +21,7 @@ const Treatments = lazy(() => import("./pages/Treatments"));
 const Invoices = lazy(() => import("./pages/Invoices"));
 const Users = lazy(() => import("./pages/Users"));
 const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 function RouteLoading() {
   const { t } = useTranslation();
@@ -42,6 +45,7 @@ function RouteLoading() {
 export default function App() {
   return (
     <AuthProvider>
+      <ToastProvider>
       <BrowserRouter>
         <Suspense fallback={<RouteLoading />}>
           <Routes>
@@ -64,14 +68,17 @@ export default function App() {
               <Route path="appointments" element={<Appointments />} />
               <Route path="appointments/:id/clinical" element={<ClinicalAppointment />} />
               <Route path="waiting-room" element={<WaitingRoom />} />
-              <Route path="treatments" element={<Treatments />} />
+              <Route path="treatments" element={<RoleRoute roles={["admin", "vet"]}><Treatments /></RoleRoute>} />
               <Route path="invoices" element={<Invoices />} />
-              <Route path="users" element={<Users />} />
+              <Route path="users" element={<RoleRoute roles={["admin"]}><Users /></RoleRoute>} />
               <Route path="settings" element={<Settings />} />
+              <Route path="*" element={<NotFound />} />
             </Route>
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

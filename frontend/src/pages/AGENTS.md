@@ -26,6 +26,11 @@ Pages own screen composition, user-flow state, and route-level loading/error/emp
 - Invoice preparation collects owner NIF, optional appointment, document/payment type, and repeatable product/service lines. The local subtotal is provisional; issuance requires a valid Vendas preview and shows its authoritative payable. The pending collection summary counts only issued FT and uses the Vendas payable, never draft subtotals.
 - Owners, pets and invoices page and search on the server through `ListPagination`. Invoice emission and retry go through a confirmation dialog showing the Vendas payable; a pending emission offers "Repetir emissão" instead of a new preview, and failed syncs show `last_sync_error`.
 - Issued FT invoices expose "Verificar pagamento" (provider reconciliation). Editing the clinical record or treatment of a completed appointment collects a correction reason before saving.
+- Creation forms never preselect a pet, owner, vet or appointment (a vet user may default to themself); submit validates the required choice explicitly.
+- The agenda shows owner and vet, supports rescheduling scheduled appointments through the edit dialog, and links to the clinical record. Cancel/no-show reasons use `PromptDialog`; per-row actions are disabled while pending.
+- The waiting room refreshes every 20 seconds while visible. Appointments whose pet/owner is archived show an archived badge, cannot be checked in or started, and the clinical page becomes read-only.
+- Invoice creation lets reception add a missing owner NIF inline. The pet invoices tab shows the Vendas document number and payable, filtered to the pet's appointments plus owner-level invoices.
+- Users (admin only) confirm role changes and activation/deactivation; Settings actions report success/failure through toasts.
 - Show local cancellation only for invoice drafts; an issued Vendas document requires an external correction flow.
 - Interpret quote expiry values without a timezone as UTC, matching the backend's stored UTC timestamps.
 

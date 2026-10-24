@@ -1,4 +1,4 @@
-const CLINIC_TIME_ZONE = "Africa/Luanda";
+export const CLINIC_TIME_ZONE = "Africa/Luanda";
 
 export function clinicDateInput(date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {

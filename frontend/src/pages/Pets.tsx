@@ -3,6 +3,9 @@ import { apiErrorMessage } from "@/api/errors";
 import { FormError } from "@/components/ui/form-error";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/contexts/ToastContext";
 import { petsApi, Pet, PetCreate } from "@/api/pets";
 import { ownersApi, Owner } from "@/api/owners";
 import { OPTIONS_LIMIT, PAGE_SIZE, totalCount } from "@/api/pagination";
@@ -23,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { clinicDateInput } from "@/lib/date";
-import { Plus, Pencil, Archive, Search, PawPrint, ChevronRight, X } from "lucide-react";
+import { Plus, Pencil, Archive, Search, PawPrint, ChevronRight } from "lucide-react";
 
 const SPECIES_OPTIONS = [
   { value: "Cão", label: "Cão", breeds: ["SRD", "Pastor Alemão", "Labrador", "Bulldog", "Rottweiler", "Golden Retriever", "Pitbull", "Beagle", "Dálmata", "Husky", "Boxer", "Poodle", "Chihuahua", "Bulldog Francês", "Cocker Spaniel", "Doberman", "Outro"] },
@@ -69,6 +72,9 @@ export default function Pets() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
+  const [archiveTarget, setArchiveTarget] = useState<Pet | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const toast = useToast();
 
   // Form state
   const [form, setForm] = useState({
@@ -106,7 +112,7 @@ export default function Pets() {
   function openCreate() {
     setEditing(null);
     setForm({
-      owner_id: owners[0]?.id ?? 0,
+      owner_id: 0,
       name: "",
       species: "Cão",
       breed: "",
@@ -131,6 +137,10 @@ export default function Pets() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.owner_id) {
+      setFormError(t("pets.form.ownerRequired"));
+      return;
+    }
     setSaving(true);
     setFormError("");
     try {
@@ -148,6 +158,7 @@ export default function Pets() {
         await petsApi.create(payload);
       }
       setShowForm(false);
+      toast.success(t(editing ? "pets.updated" : "pets.created"));
       load();
     } catch (requestError: unknown) {
       setFormError(apiErrorMessage(requestError, t, "pets.error"));
@@ -156,15 +167,21 @@ export default function Pets() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm(t("pets.archiveConfirm"))) return;
+  async function confirmArchive() {
+    if (!archiveTarget) return;
+    setArchiving(true);
     try {
-      await petsApi.delete(id);
+      await petsApi.delete(archiveTarget.id);
+      toast.success(t("pets.archived", { name: archiveTarget.name }));
+      setArchiveTarget(null);
       load();
     } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "pets.error"));
+      toast.error(apiErrorMessage(requestError, t, "pets.error"));
+    } finally {
+      setArchiving(false);
     }
   }
+
 
   function getOwnerName(pet: Pet) {
     return pet.owner_name ?? owners.find((o) => o.id === pet.owner_id)?.name ?? "—";
@@ -194,6 +211,7 @@ export default function Pets() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
         <Input
           placeholder={t("pets.search")}
+          aria-label={t("pets.search")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -269,13 +287,15 @@ export default function Pets() {
                         <button
                           onClick={() => openEdit(p)}
                           title={t("common.edit")}
+                          aria-label={t("pets.editNamed", { name: p.name })}
                           className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDelete(p.id)}
+                          onClick={() => setArchiveTarget(p)}
                           title={t("common.archive")}
+                          aria-label={t("pets.archiveNamed", { name: p.name })}
                           className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                         >
                           <Archive className="w-3.5 h-3.5" />
@@ -291,34 +311,13 @@ export default function Pets() {
         </CardContent>
       </Card>
 
-      {/* Modal */}
-      {showForm && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div>
-                <h2 className="font-bold text-dark-900">
-                  {editing ? t("pets.edit") : t("pets.new")}
-                </h2>
-                <p className="text-dark-400 text-xs mt-0.5">
-                  {editing ? t("pets.editing", { name: editing.name }) : t("pets.createHint")}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowForm(false)}
-                className="w-8 h-8 rounded-xl bg-dark-100 flex items-center justify-center text-dark-400 hover:text-dark-700 hover:bg-dark-200 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+      <FormDialog
+        open={showForm}
+        onOpenChange={setShowForm}
+        size="lg"
+        title={editing ? t("pets.edit") : t("pets.new")}
+        description={editing ? t("pets.editing", { name: editing.name }) : t("pets.createHint")}
+      >
             {/* Modal body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               <FormError message={formError} />
@@ -340,8 +339,9 @@ export default function Pets() {
               {/* Name + Species */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.name")} *</Label>
+                  <Label htmlFor="pet-name" className="text-xs font-semibold text-dark-600">{t("pets.form.name")} *</Label>
                   <Input
+                  id="pet-name"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder={t("pets.form.namePlaceholder")}
@@ -350,8 +350,9 @@ export default function Pets() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.species")} *</Label>
+                  <Label htmlFor="pet-species" className="text-xs font-semibold text-dark-600">{t("pets.form.species")} *</Label>
                   <FormSelect
+                  id="pet-species"
                     value={form.species}
                     onValueChange={(value) => setForm({ ...form, species: value, breed: "" })}
                     options={SPECIES_OPTIONS.map(({ value }) => ({ value, label: t(`pets.species.${value}`) }))}
@@ -402,8 +403,9 @@ export default function Pets() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-dark-600">{t("pets.form.weight")}</Label>
+                  <Label htmlFor="pet-weight" className="text-xs font-semibold text-dark-600">{t("pets.form.weight")}</Label>
                   <Input
+                  id="pet-weight"
                     type="number"
                     step="0.1"
                     min="0"
@@ -457,9 +459,19 @@ export default function Pets() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </FormDialog>
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        onOpenChange={(open) => { if (!open) setArchiveTarget(null); }}
+        title={t("pets.archiveTitle")}
+        description={archiveTarget ? t("pets.archiveConfirm", { name: archiveTarget.name }) : undefined}
+        confirmLabel={t("common.archive")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        pending={archiving}
+        onConfirm={confirmArchive}
+      />
     </div>
   );
 }

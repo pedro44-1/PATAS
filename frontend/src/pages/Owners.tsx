@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { FormDialog } from "@/components/ui/form-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/contexts/ToastContext";
 import { ownersApi, Owner, OwnerCreate } from "@/api/owners";
 import { apiErrorMessage } from "@/api/errors";
 import { PAGE_SIZE, totalCount } from "@/api/pagination";
@@ -19,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Archive, Plus, Pencil, Phone, Mail, MapPin, Search, X } from "lucide-react";
+import { Archive, Plus, Pencil, Phone, Mail, MapPin, Search } from "lucide-react";
 
 export default function Owners() {
   const { t } = useTranslation();
@@ -42,6 +45,9 @@ export default function Owners() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
+  const [archiveTarget, setArchiveTarget] = useState<Owner | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const toast = useToast();
 
   function load() {
     setLoading(true);
@@ -88,6 +94,7 @@ export default function Owners() {
         await ownersApi.create(form);
       }
       setShowForm(false);
+      toast.success(t(editing ? "owners.updated" : "owners.created"));
       load();
     } catch (requestError: unknown) {
       setFormError(apiErrorMessage(requestError, t, "owners.error"));
@@ -96,13 +103,18 @@ export default function Owners() {
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm(t("owners.archiveConfirm"))) return;
+  async function confirmArchive() {
+    if (!archiveTarget) return;
+    setArchiving(true);
     try {
-      await ownersApi.delete(id);
+      await ownersApi.delete(archiveTarget.id);
+      toast.success(t("owners.archived", { name: archiveTarget.name }));
+      setArchiveTarget(null);
       load();
     } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "owners.error"));
+      toast.error(apiErrorMessage(requestError, t, "owners.error"));
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -128,6 +140,7 @@ export default function Owners() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
         <Input
           placeholder={t("owners.search")}
+          aria-label={t("owners.search")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -212,13 +225,14 @@ export default function Owners() {
                         <button
                           onClick={() => openEdit(o)}
                           className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          aria-label={t("owners.editNamed", { name: o.name })}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleDelete(o.id)}
+                          onClick={() => setArchiveTarget(o)}
                           className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                          aria-label={t("common.archive")}
+                          aria-label={t("owners.archiveNamed", { name: o.name })}
                         >
                           <Archive className="w-3.5 h-3.5" />
                         </button>
@@ -233,40 +247,19 @@ export default function Owners() {
         </CardContent>
       </Card>
 
-      {/* Modal with solid background */}
-      {showForm && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="sticky top-0 bg-white border-b border-dark-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div>
-                <h2 className="font-bold text-dark-900">
-                  {t(editing ? "owners.edit" : "owners.new")}
-                </h2>
-                <p className="text-dark-400 text-xs mt-0.5">
-                  {editing ? t("owners.editing", { name: editing.name }) : t("owners.createHint")}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowForm(false)}
-                className="w-8 h-8 rounded-xl bg-dark-100 flex items-center justify-center text-dark-400 hover:text-dark-700 hover:bg-dark-200 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
+      <FormDialog
+        open={showForm}
+        onOpenChange={setShowForm}
+        title={t(editing ? "owners.edit" : "owners.new")}
+        description={editing ? t("owners.editing", { name: editing.name }) : t("owners.createHint")}
+      >
             {/* Modal body */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <FormError message={formError} />
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.name")} *</Label>
+                <Label htmlFor="owner-name" className="text-xs font-semibold text-dark-600">{t("owners.form.name")} *</Label>
                 <Input
+                  id="owner-name"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder={t("owners.form.name")}
@@ -275,8 +268,9 @@ export default function Owners() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.phone")}</Label>
+                <Label htmlFor="owner-phone" className="text-xs font-semibold text-dark-600">{t("owners.form.phone")}</Label>
                 <Input
+                  id="owner-phone"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                   placeholder={t("owners.form.phonePlaceholder")}
@@ -284,8 +278,9 @@ export default function Owners() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.email")}</Label>
+                <Label htmlFor="owner-email" className="text-xs font-semibold text-dark-600">{t("owners.form.email")}</Label>
                 <Input
+                  id="owner-email"
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -294,8 +289,9 @@ export default function Owners() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.address")}</Label>
+                <Label htmlFor="owner-address" className="text-xs font-semibold text-dark-600">{t("owners.form.address")}</Label>
                 <Input
+                  id="owner-address"
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   placeholder={t("owners.form.addressPlaceholder")}
@@ -303,8 +299,9 @@ export default function Owners() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.nif")}</Label>
+                <Label htmlFor="owner-nif" className="text-xs font-semibold text-dark-600">{t("owners.form.nif")}</Label>
                 <Input
+                  id="owner-nif"
                   value={form.nif}
                   onChange={(e) => setForm({ ...form, nif: e.target.value })}
                   placeholder={t("owners.form.nifPlaceholder")}
@@ -313,8 +310,9 @@ export default function Owners() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-dark-600">{t("owners.form.notes")}</Label>
+                <Label htmlFor="owner-notes" className="text-xs font-semibold text-dark-600">{t("owners.form.notes")}</Label>
                 <Input
+                  id="owner-notes"
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   placeholder={t("owners.form.notesPlaceholder")}
@@ -350,9 +348,19 @@ export default function Owners() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </FormDialog>
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        onOpenChange={(open) => { if (!open) setArchiveTarget(null); }}
+        title={t("owners.archiveTitle")}
+        description={archiveTarget ? t("owners.archiveConfirm", { name: archiveTarget.name }) : undefined}
+        confirmLabel={t("common.archive")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        pending={archiving}
+        onConfirm={confirmArchive}
+      />
     </div>
   );
 }

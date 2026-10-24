@@ -45,8 +45,13 @@ export default function ClinicalAppointment() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const appointmentId = Number(id);
-  const canWrite = user?.role === "admin" || user?.role === "vet";
   const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const recordLocked = appointment !== null && (
+    appointment.status === "cancelled"
+    || appointment.status === "no-show"
+    || (Boolean(appointment.subject_archived) && appointment.status !== "completed")
+  );
+  const canWrite = (user?.role === "admin" || user?.role === "vet") && !recordLocked;
   const [pet, setPet] = useState<Pet | null>(null);
   const [owner, setOwner] = useState<Owner | null>(null);
   const [vets, setVets] = useState<VetOption[]>([]);
@@ -184,12 +189,13 @@ export default function ClinicalAppointment() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="ghost" onClick={() => navigate(-1)}><ArrowLeft className="mr-2 size-4" />{t("common.back")}</Button>
+        <Button variant="ghost" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/appointments"))}><ArrowLeft className="mr-2 size-4" />{t("common.back")}</Button>
         <div className="flex items-center gap-2">{message && <span className="text-sm text-muted-foreground">{message}</span>}{canWrite && <Button onClick={() => save()} disabled={saving || transitioning}><Save className="mr-2 size-4" />{saving ? t("common.saving") : t("clinicalAppointment.save")}</Button>}{canWrite && appointment.status === "scheduled" && <Button variant="outline" onClick={startAppointment} disabled={transitioning}>{t("clinicalAppointment.start")}</Button>}{canWrite && appointment.status === "in-progress" && <Button variant="outline" onClick={completeAppointment} disabled={saving || transitioning}>{t("clinicalAppointment.complete")}</Button>}</div>
       </div>
 
       <Card className="overflow-hidden"><CardContent className="p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground"><Stethoscope className="size-5" /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="break-words text-xl font-extrabold text-foreground">{pet.name}</h2><Badge variant="outline">{pet.species}</Badge>{pet.breed && <Badge variant="outline">{pet.breed}</Badge>}{pet.archived_at && <Badge variant="destructive">{t("common.archived")}</Badge>}</div><p className="mt-1 text-sm text-muted-foreground">{owner?.name ?? "—"} · {parseApiDate(appointment.scheduled_at).toLocaleString("pt-AO", { dateStyle: "short", timeStyle: "short", timeZone: "Africa/Luanda" })}</p></div></div><div className="text-right"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("clinicalAppointment.responsible")}</p><p className="mt-1 text-sm font-bold text-foreground">{vets.find((vet) => vet.id === appointment.vet_id)?.name ?? "—"}</p><Badge className="mt-2" variant="secondary">{t(`status.${appointment.status}`)}</Badge></div></div></CardContent></Card>
 
+      {appointment.subject_archived && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">{t("clinicalAppointment.archivedSubject")}</div>}
       {canWrite && appointment.status === "completed" && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10"><Label htmlFor="correction-reason" className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t("clinicalAppointment.correction.label")}</Label><p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">{t("clinicalAppointment.correction.hint")}</p><Input id="correction-reason" value={correctionReason} maxLength={500} onChange={(event) => setCorrectionReason(event.target.value)} className="mt-2 bg-background" /></div>}
 
       <form onSubmit={save} className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(22rem,0.9fr)]">

@@ -22,20 +22,25 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import type { UserRole } from "@patas/shared-types";
 
-const NAV_ITEMS = [
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles?: UserRole[] };
+
+const visibleFor = (items: NavItem[], role?: UserRole) => items.filter((item) => !item.roles || (role && item.roles.includes(role)));
+
+const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", label: "nav.dashboard", icon: LayoutDashboard },
   { to: "/waiting-room", label: "nav.waitingRoom", icon: ClipboardCheck },
   { to: "/appointments", label: "nav.appointments", icon: CalendarDays },
   { to: "/owners", label: "nav.owners", icon: Users },
   { to: "/pets", label: "nav.pets", icon: PawPrint },
-  { to: "/treatments", label: "nav.treatments", icon: Pill },
+  { to: "/treatments", label: "nav.treatments", icon: Pill, roles: ["admin", "vet"] },
   { to: "/invoices", label: "nav.invoices", icon: FileText },
 ];
 
-const SYSTEM_ITEMS = [
+const SYSTEM_ITEMS: NavItem[] = [
   { to: "/settings", label: "nav.settings", icon: Settings },
-  { to: "/users", label: "nav.users", icon: UserCircle },
+  { to: "/users", label: "nav.users", icon: UserCircle, roles: ["admin"] },
 ];
 
 const MOBILE_ITEMS = [
@@ -65,13 +70,14 @@ function initials(name?: string) {
 function Navigation({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const location = useLocation();
+  const { user } = useAuth();
 
   return (
     <nav className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-3 py-6">
       <div>
         <p className="px-3 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">{t("nav.main")}</p>
         <div className="mt-3 space-y-1">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
+          {visibleFor(NAV_ITEMS, user?.role).map(({ to, label, icon: Icon }) => {
             const active = location.pathname.startsWith(to);
             return (
               <NavLink
@@ -93,7 +99,7 @@ function Navigation({ onNavigate }: { onNavigate?: () => void }) {
       <div>
         <p className="px-3 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">{t("nav.system")}</p>
         <div className="mt-3 space-y-1">
-          {SYSTEM_ITEMS.map(({ to, label, icon: Icon }) => {
+          {visibleFor(SYSTEM_ITEMS, user?.role).map(({ to, label, icon: Icon }) => {
             const active = location.pathname.startsWith(to);
             return (
               <NavLink

@@ -94,7 +94,8 @@
       "owners": "Owners",
       "appointments": "Appointments",
       "treatments": "Treatments"
-    }
+    },
+    "loadError": "Could not load the dashboard."
   },
   "appointments": {
     "title": "Appointments",
@@ -123,7 +124,9 @@
       "notesPlaceholder": "Additional notes",
       "duration": "Duration",
       "weight": "Recorded weight (kg)",
-      "weightPlaceholder": "E.g. 12.5"
+      "weightPlaceholder": "E.g. 12.5",
+      "animalRequired": "Choose the animal for the appointment.",
+      "vetRequired": "Choose the vet."
     },
     "quickPet": {
       "title": "Quick animal registration",
@@ -143,7 +146,8 @@
       "reason": "Reason",
       "duration": "Duration",
       "status": "Status",
-      "actions": "Actions"
+      "actions": "Actions",
+      "vet": "Vet"
     },
     "status": {
       "scheduled": "Scheduled",
@@ -156,11 +160,22 @@
       "start": "Start",
       "complete": "Complete",
       "cancel": "Cancel",
-      "noShow": "No-show"
+      "noShow": "No-show",
+      "reschedule": "Reschedule",
+      "record": "Record"
     },
-    "cancelReason": "Enter the cancellation reason:",
-    "noShowReason": "Enter the no-show reason:",
-    "error": "The appointment could not be updated."
+    "cancelReason": "Cancellation reason",
+    "noShowReason": "No-show reason",
+    "error": "The appointment could not be updated.",
+    "reschedule": {
+      "title": "Reschedule appointment",
+      "hint": "Change the date, duration or vet for {{name}}.",
+      "save": "Save changes"
+    },
+    "rescheduled": "Appointment rescheduled.",
+    "created": "Appointment scheduled.",
+    "cancelTitle": "Cancel {{name}}'s appointment?",
+    "noShowTitle": "Mark {{name}} as no-show?"
   },
   "owners": {
     "title": "Owners",
@@ -175,7 +190,7 @@
     "createHint": "Register a new owner",
     "editing": "Editing {{name}}",
     "saveChanges": "Save changes",
-    "archiveConfirm": "Archive this owner and their animals? History will be preserved.",
+    "archiveConfirm": "{{name}} and their pets will no longer appear in lists. History is kept.",
     "error": "The owner could not be updated.",
     "form": {
       "name": "Full name",
@@ -196,7 +211,13 @@
       "email": "Email",
       "address": "Address",
       "actions": "Actions"
-    }
+    },
+    "archiveTitle": "Archive owner?",
+    "archived": "{{name}} was archived.",
+    "created": "Owner created.",
+    "updated": "Changes saved.",
+    "editNamed": "Edit {{name}}",
+    "archiveNamed": "Archive {{name}}"
   },
   "pets": {
     "title": "Animals",
@@ -210,7 +231,7 @@
     "createHint": "Register a new animal",
     "editing": "Editing {{name}}",
     "saveChanges": "Save changes",
-    "archiveConfirm": "Archive this animal? History will be preserved.",
+    "archiveConfirm": "{{name}} will no longer appear in lists or receive new appointments. History is kept.",
     "error": "The animal could not be updated.",
     "history": "View history",
     "age": {
@@ -236,7 +257,8 @@
       "notes": "Notes",
       "notesPlaceholder": "Additional notes",
       "ageDisplay": "{{age}} old",
-      "birthDateFormatted": "born {{date}}"
+      "birthDateFormatted": "born {{date}}",
+      "ownerRequired": "Choose the pet's owner."
     },
     "table": {
       "animal": "Animal",
@@ -279,7 +301,8 @@
         "noData": "No treatments recorded"
       },
       "invoices": {
-        "noData": "No invoices recorded"
+        "noData": "No invoices recorded",
+        "ownerLevel": "Owner-level"
       }
     },
     "species": {
@@ -290,7 +313,13 @@
       "Coelho": "Rabbit",
       "Réptil": "Reptile",
       "Outro": "Other"
-    }
+    },
+    "archiveTitle": "Archive pet?",
+    "archived": "{{name}} was archived.",
+    "created": "Pet registered.",
+    "updated": "Changes saved.",
+    "editNamed": "Edit {{name}}",
+    "archiveNamed": "Archive {{name}}"
   },
   "treatments": {
     "title": "Treatments",
@@ -313,7 +342,8 @@
       "diagnosis": "Diagnosis",
       "diagnosisPlaceholder": "Diagnosis result",
       "prescription": "Prescription / medication",
-      "prescriptionPlaceholder": "Prescribed medication"
+      "prescriptionPlaceholder": "Prescribed medication",
+      "appointmentRequired": "Choose the treatment's appointment."
     },
     "voice": {
       "start": "Dictate",
@@ -361,9 +391,19 @@
       "examHint": "Systems and findings used by veterinarians.",
       "newSystem": "New system",
       "systemPlaceholder": "E.g. Neurological assessment",
-      "renamePrompt": "New service name:",
-      "findingPrompt": "Name of the new clinical finding:"
-    }
+      "renamePrompt": "Service name",
+      "findingPrompt": "Finding name",
+      "saved": "Catalogue updated.",
+      "renameTitle": "Rename service",
+      "findingTitle": "New clinical finding",
+      "renameNamed": "Rename {{name}}",
+      "activateNamed": "Activate {{name}}",
+      "deactivateNamed": "Deactivate {{name}}",
+      "addFindingTo": "Add finding to {{name}}"
+    },
+    "loadError": "Some settings could not be loaded.",
+    "saveError": "Could not save the change.",
+    "billingSaved": "Billing details saved."
   },
   "users": {
     "title": "Users",
@@ -379,7 +419,21 @@
     "temporaryPassword": "Temporary password",
     "passwordPending": "Password change pending",
     "created": "User created successfully.",
-    "createError": "The user could not be created."
+    "createError": "The user could not be created.",
+    "loadError": "Could not load the team.",
+    "updateError": "Could not update the user.",
+    "roleChanged": "{{name}} is now {{role}}.",
+    "activated": "{{name}} was reactivated.",
+    "deactivated": "{{name}} was deactivated and signed out.",
+    "confirmRoleTitle": "Change {{name}}'s role?",
+    "confirmRoleDescription": "The new role will be {{role}}. Permissions change on the next request.",
+    "confirmActivateTitle": "Reactivate {{name}}?",
+    "confirmDeactivateTitle": "Deactivate {{name}}?",
+    "confirmDeactivateDescription": "They can no longer sign in and all open sessions end. History is kept.",
+    "activate": "Reactivate",
+    "deactivate": "Deactivate",
+    "inactive": "Inactive",
+    "roleFor": "Role for {{name}}"
   },
   "invoices": {
     "title": "Invoices",
@@ -392,7 +446,7 @@
     "issuing": "Issuing...",
     "saveDraft": "Save draft",
     "savingDraft": "Saving...",
-    "cancelReason": "Enter the cancellation reason:",
+    "cancelReason": "Cancellation reason",
     "error": "The invoice could not be updated.",
     "previewError": "The fiscal preview could not be calculated by Vendas.",
     "trainingNotice": "Billing integration is in trial mode. Vendas TRAINING does not produce fiscally valid documents.",
@@ -426,7 +480,11 @@
       "unitPrice": "Unit price",
       "vatProfile": "VAT profile",
       "vatProfileDefault": "Default",
-      "taxRate": "Tax (%)"
+      "taxRate": "Tax (%)",
+      "ownerRequired": "Choose the owner to invoice.",
+      "saveNif": "Save NIF",
+      "nifSaved": "Owner NIF updated.",
+      "removeItem": "Remove line"
     },
     "documentType": {
       "FT": "Invoice (FT) — payment later",
@@ -487,7 +545,9 @@
       "retryTitle": "Retry the pending emission?",
       "description": "Issuing in Vendas cannot be undone. Check the customer and total before continuing."
     },
-    "reconcileError": "Could not check the payment in Vendas."
+    "reconcileError": "Could not check the payment in Vendas.",
+    "cancelTitle": "Cancel this draft?",
+    "draftSaved": "Draft saved. Calculate the Vendas preview to issue it."
   },
   "clinical": {
     "timeline": {
@@ -542,9 +602,10 @@
     },
     "actions": {
       "void": "Void",
-      "voidPrompt": "Enter the mandatory reason for voiding this record:",
+      "voidPrompt": "Reason for voiding",
       "complete": "Complete",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "voidTitle": "Void {{name}}?"
     },
     "errors": {
       "save": "Could not save the clinical record.",
@@ -585,9 +646,11 @@
       "complete": "Complete",
       "noShow": "No-show",
       "cancel": "Cancel",
-      "cancelPrompt": "Enter the cancellation reason:",
-      "noShowPrompt": "Enter the no-show reason:",
-      "openClinical": "Open encounter"
+      "cancelPrompt": "Cancellation reason",
+      "noShowPrompt": "No-show reason",
+      "openClinical": "Open encounter",
+      "cancelTitle": "Cancel {{name}}'s entry?",
+      "noShowTitle": "Mark {{name}} as no-show?"
     },
     "form": {
       "pet": "Animal",
@@ -607,7 +670,9 @@
       "load": "The waiting room could not be loaded.",
       "save": "The entry could not be added.",
       "transition": "The entry status could not be updated."
-    }
+    },
+    "date": "Queue date",
+    "checkedIn": "{{name}} joined the queue."
   },
   "clinicalAppointment": {
     "responsible": "Responsible veterinarian",
@@ -668,7 +733,8 @@
       "label": "Correction reason",
       "hint": "This visit is completed. Every change is recorded in the audit log with the reason given.",
       "required": "Enter the correction reason before saving."
-    }
+    },
+    "archivedSubject": "The pet or owner of this appointment is archived. The clinical record is read-only and the appointment can only be cancelled."
   },
   "common": {
     "save": "Save",
@@ -693,7 +759,11 @@
     "add": "Add",
     "archived": "Archived",
     "archive": "Archive",
-    "close": "Close"
+    "close": "Close",
+    "noResults": "No results",
+    "openOptions": "Open options",
+    "minutesShort": "{{count}} min",
+    "retry": "Try again"
   },
   "roles": {
     "admin": "Administrator",
@@ -730,5 +800,10 @@
     "range": "{{from}}–{{to}} of {{total}}",
     "previous": "Previous page",
     "next": "Next page"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The address does not exist or was moved.",
+    "back": "Back to dashboard"
   }
 }

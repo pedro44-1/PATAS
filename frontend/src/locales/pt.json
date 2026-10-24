@@ -94,7 +94,8 @@
       "owners": "Donos",
       "appointments": "Consultas",
       "treatments": "Tratamentos"
-    }
+    },
+    "loadError": "Não foi possível carregar o painel."
   },
   "appointments": {
     "title": "Consultas",
@@ -123,7 +124,9 @@
       "notesPlaceholder": "Notas adicionais",
       "duration": "Duração",
       "weight": "Peso registado (kg)",
-      "weightPlaceholder": "Ex: 12.5"
+      "weightPlaceholder": "Ex: 12.5",
+      "animalRequired": "Escolha o animal da consulta.",
+      "vetRequired": "Escolha o veterinário."
     },
     "quickPet": {
       "title": "Registo rápido de animal",
@@ -143,7 +146,8 @@
       "reason": "Motivo",
       "duration": "Duração",
       "status": "Estado",
-      "actions": "Ações"
+      "actions": "Ações",
+      "vet": "Veterinário"
     },
     "status": {
       "scheduled": "Agendada",
@@ -156,11 +160,22 @@
       "start": "Iniciar",
       "complete": "Concluir",
       "cancel": "Cancelar",
-      "noShow": "Faltou"
+      "noShow": "Faltou",
+      "reschedule": "Reagendar",
+      "record": "Ficha"
     },
-    "cancelReason": "Indique o motivo do cancelamento:",
-    "noShowReason": "Indique o motivo da falta:",
-    "error": "Não foi possível atualizar a consulta."
+    "cancelReason": "Motivo do cancelamento",
+    "noShowReason": "Motivo da falta",
+    "error": "Não foi possível atualizar a consulta.",
+    "reschedule": {
+      "title": "Reagendar consulta",
+      "hint": "Altere a data, a duração ou o veterinário de {{name}}.",
+      "save": "Guardar alterações"
+    },
+    "rescheduled": "Consulta reagendada.",
+    "created": "Consulta agendada.",
+    "cancelTitle": "Cancelar a consulta de {{name}}?",
+    "noShowTitle": "Registar falta de {{name}}?"
   },
   "owners": {
     "title": "Donos",
@@ -175,7 +190,7 @@
     "createHint": "Registar um novo dono",
     "editing": "A editar {{name}}",
     "saveChanges": "Guardar alterações",
-    "archiveConfirm": "Arquivar este dono e os seus animais? O histórico será preservado.",
+    "archiveConfirm": "{{name}} e os respetivos animais deixam de aparecer nas listas. O histórico mantém-se.",
     "error": "Não foi possível atualizar o dono.",
     "form": {
       "name": "Nome completo",
@@ -196,7 +211,13 @@
       "email": "Email",
       "address": "Endereço",
       "actions": "Ações"
-    }
+    },
+    "archiveTitle": "Arquivar dono?",
+    "archived": "{{name}} foi arquivado.",
+    "created": "Dono criado.",
+    "updated": "Alterações guardadas.",
+    "editNamed": "Editar {{name}}",
+    "archiveNamed": "Arquivar {{name}}"
   },
   "pets": {
     "title": "Animais",
@@ -210,7 +231,7 @@
     "createHint": "Registar um novo animal",
     "editing": "A editar {{name}}",
     "saveChanges": "Guardar Alterações",
-    "archiveConfirm": "Arquivar este animal? O histórico será preservado.",
+    "archiveConfirm": "{{name}} deixa de aparecer nas listas e não pode ter novas consultas. O histórico mantém-se.",
     "error": "Não foi possível atualizar o animal.",
     "history": "Ver histórico",
     "age": {
@@ -236,7 +257,8 @@
       "notes": "Notas",
       "notesPlaceholder": "Notas adicionais",
       "ageDisplay": "{{age}} de idade",
-      "birthDateFormatted": "nasc. {{date}}"
+      "birthDateFormatted": "nasc. {{date}}",
+      "ownerRequired": "Escolha o dono do animal."
     },
     "table": {
       "animal": "Animal",
@@ -279,7 +301,8 @@
         "noData": "Nenhum tratamento registado"
       },
       "invoices": {
-        "noData": "Nenhuma fatura registada"
+        "noData": "Nenhuma fatura registada",
+        "ownerLevel": "Do dono"
       }
     },
     "species": {
@@ -290,7 +313,13 @@
       "Coelho": "Coelho",
       "Réptil": "Réptil",
       "Outro": "Outro"
-    }
+    },
+    "archiveTitle": "Arquivar animal?",
+    "archived": "{{name}} foi arquivado.",
+    "created": "Animal registado.",
+    "updated": "Alterações guardadas.",
+    "editNamed": "Editar {{name}}",
+    "archiveNamed": "Arquivar {{name}}"
   },
   "treatments": {
     "title": "Tratamentos",
@@ -313,7 +342,8 @@
       "diagnosis": "Diagnóstico",
       "diagnosisPlaceholder": "Resultado do diagnóstico",
       "prescription": "Prescrição / Medicação",
-      "prescriptionPlaceholder": "Medicação prescrita"
+      "prescriptionPlaceholder": "Medicação prescrita",
+      "appointmentRequired": "Escolha a consulta do tratamento."
     },
     "voice": {
       "start": "Ditar",
@@ -348,7 +378,7 @@
     "issuing": "A emitir...",
     "saveDraft": "Guardar rascunho",
     "savingDraft": "A guardar...",
-    "cancelReason": "Indique o motivo do cancelamento:",
+    "cancelReason": "Motivo do cancelamento",
     "error": "Não foi possível atualizar a fatura.",
     "previewError": "Não foi possível calcular a prévia fiscal no Vendas.",
     "trainingNotice": "Integração de faturação em modo de ensaio. O Vendas em TRAINING não produz documentos com validade fiscal.",
@@ -382,7 +412,11 @@
       "unitPrice": "Preço unitário",
       "vatProfile": "Perfil IVA",
       "vatProfileDefault": "Predefinido",
-      "taxRate": "Imposto (%)"
+      "taxRate": "Imposto (%)",
+      "ownerRequired": "Escolha o dono a faturar.",
+      "saveNif": "Guardar NIF",
+      "nifSaved": "NIF do dono atualizado.",
+      "removeItem": "Remover linha"
     },
     "documentType": {
       "FT": "Fatura (FT) — pagamento posterior",
@@ -443,7 +477,9 @@
       "retryTitle": "Repetir a emissão pendente?",
       "description": "A emissão no Vendas é irreversível. Confirme o cliente e o total antes de continuar."
     },
-    "reconcileError": "Não foi possível verificar o pagamento no Vendas."
+    "reconcileError": "Não foi possível verificar o pagamento no Vendas.",
+    "cancelTitle": "Cancelar este rascunho?",
+    "draftSaved": "Rascunho guardado. Calcule a prévia no Vendas para emitir."
   },
   "clinical": {
     "timeline": {
@@ -498,9 +534,10 @@
     },
     "actions": {
       "void": "Anular",
-      "voidPrompt": "Indique o motivo obrigatório para anular este registo:",
+      "voidPrompt": "Motivo da anulação",
       "complete": "Concluir",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "voidTitle": "Anular {{name}}?"
     },
     "errors": {
       "save": "Não foi possível guardar o registo clínico.",
@@ -541,9 +578,11 @@
       "complete": "Concluir",
       "noShow": "Faltou",
       "cancel": "Cancelar",
-      "cancelPrompt": "Indique o motivo do cancelamento:",
-      "noShowPrompt": "Indique o motivo da falta:",
-      "openClinical": "Abrir atendimento"
+      "cancelPrompt": "Motivo do cancelamento",
+      "noShowPrompt": "Motivo da falta",
+      "openClinical": "Abrir atendimento",
+      "cancelTitle": "Cancelar a entrada de {{name}}?",
+      "noShowTitle": "Registar falta de {{name}}?"
     },
     "form": {
       "pet": "Animal",
@@ -563,7 +602,9 @@
       "load": "Não foi possível carregar a sala de espera.",
       "save": "Não foi possível adicionar a entrada.",
       "transition": "Não foi possível atualizar o estado da entrada."
-    }
+    },
+    "date": "Data da fila",
+    "checkedIn": "{{name}} entrou na fila."
   },
   "clinicalAppointment": {
     "responsible": "Veterinário responsável",
@@ -624,7 +665,8 @@
       "label": "Motivo da correção",
       "hint": "Este atendimento está concluído. Cada alteração fica registada na auditoria com o motivo indicado.",
       "required": "Indique o motivo da correção antes de guardar."
-    }
+    },
+    "archivedSubject": "O animal ou o dono desta consulta está arquivado. O registo clínico fica só de leitura e a consulta apenas pode ser cancelada."
   },
   "settings": {
     "title": "Configurações",
@@ -650,9 +692,19 @@
       "examHint": "Sistemas e achados usados pelos veterinários.",
       "newSystem": "Novo sistema",
       "systemPlaceholder": "Ex.: Avaliação neurológica",
-      "renamePrompt": "Novo nome do serviço:",
-      "findingPrompt": "Nome do novo achado clínico:"
-    }
+      "renamePrompt": "Nome do serviço",
+      "findingPrompt": "Nome do achado",
+      "saved": "Catálogo atualizado.",
+      "renameTitle": "Renomear serviço",
+      "findingTitle": "Novo achado clínico",
+      "renameNamed": "Renomear {{name}}",
+      "activateNamed": "Ativar {{name}}",
+      "deactivateNamed": "Desativar {{name}}",
+      "addFindingTo": "Adicionar achado a {{name}}"
+    },
+    "loadError": "Parte das definições não foi carregada.",
+    "saveError": "Não foi possível guardar a alteração.",
+    "billingSaved": "Dados de faturação guardados."
   },
   "users": {
     "title": "Utilizadores",
@@ -668,7 +720,21 @@
     "temporaryPassword": "Palavra-passe temporária",
     "passwordPending": "Alteração de palavra-passe pendente",
     "created": "Utilizador criado com sucesso.",
-    "createError": "Não foi possível criar o utilizador."
+    "createError": "Não foi possível criar o utilizador.",
+    "loadError": "Não foi possível carregar a equipa.",
+    "updateError": "Não foi possível atualizar o utilizador.",
+    "roleChanged": "{{name}} é agora {{role}}.",
+    "activated": "{{name}} foi reativado.",
+    "deactivated": "{{name}} foi desativado e as sessões terminadas.",
+    "confirmRoleTitle": "Alterar a função de {{name}}?",
+    "confirmRoleDescription": "A nova função será {{role}}. As permissões mudam no próximo pedido.",
+    "confirmActivateTitle": "Reativar {{name}}?",
+    "confirmDeactivateTitle": "Desativar {{name}}?",
+    "confirmDeactivateDescription": "A pessoa deixa de conseguir entrar e todas as sessões abertas terminam. O histórico mantém-se.",
+    "activate": "Reativar",
+    "deactivate": "Desativar",
+    "inactive": "Inativo",
+    "roleFor": "Função de {{name}}"
   },
   "common": {
     "save": "Guardar",
@@ -693,7 +759,11 @@
     "add": "Adicionar",
     "archived": "Arquivado",
     "archive": "Arquivar",
-    "close": "Fechar"
+    "close": "Fechar",
+    "noResults": "Sem resultados",
+    "openOptions": "Abrir opções",
+    "minutesShort": "{{count}} min",
+    "retry": "Tentar novamente"
   },
   "roles": {
     "admin": "Administrador",
@@ -730,5 +800,10 @@
     "range": "{{from}}–{{to}} de {{total}}",
     "previous": "Página anterior",
     "next": "Página seguinte"
+  },
+  "notFound": {
+    "title": "Página não encontrada",
+    "description": "O endereço não existe ou foi movido.",
+    "back": "Voltar ao painel"
   }
 }

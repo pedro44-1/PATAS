@@ -49,4 +49,31 @@ describe("FormSelect", () => {
 
     expect(onValueChange).toHaveBeenCalledWith("__create_pet__");
   });
+
+  it("switches to a searchable list for long option sets and keeps workflow actions", async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const names = ["Ámbar", "Bobby", "Café", "Duke", "Estrela", "Faísca", "Gaia", "Hulk", "Íris", "Jade", "Kiko"];
+
+    render(
+      <FormSelect
+        ariaLabel="Animal"
+        value={null}
+        onValueChange={onValueChange}
+        options={[
+          { value: "__create__", label: "Registar novo animal", variant: "action" },
+          ...names.map((name) => ({ value: name.toLowerCase(), label: name })),
+        ]}
+      />,
+    );
+
+    const input = screen.getByRole("combobox", { name: "Animal" });
+    await user.type(input, "iris");
+    expect(screen.getByRole("option", { name: "Íris" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "Registar novo animal" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: "Duke" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("option", { name: "Íris" }));
+    expect(onValueChange).toHaveBeenCalledWith("íris");
+  });
 });

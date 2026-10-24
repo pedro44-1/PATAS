@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import api from "@/api/client";
+import { apiErrorMessage } from "@/api/errors";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -101,13 +103,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
+    setLoadError("");
     api.get<DashboardStats>("/dashboard/")
       .then((r) => setStats(r.data))
-      .catch(() => {})
+      .catch((requestError: unknown) => setLoadError(apiErrorMessage(requestError, t, "dashboard.loadError")))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { load(); }, []);
 
   if (loading) {
     return (
@@ -117,6 +124,17 @@ export default function Dashboard() {
           <p className="text-sm">{t("common.loading")}</p>
         </div>
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Card className="mx-auto max-w-lg">
+        <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+          <p role="alert" className="text-sm text-destructive">{loadError}</p>
+          <Button variant="outline" onClick={load}>{t("common.retry")}</Button>
+        </CardContent>
+      </Card>
     );
   }
 

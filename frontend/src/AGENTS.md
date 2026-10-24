@@ -13,6 +13,7 @@ This parent owns `App.tsx`, `main.tsx`, `i18n.ts`, global CSS, and the boundarie
 - Keep API contracts aligned with backend schemas and `@patas/shared-types` where a shared type exists.
 - Authenticated requests use the shared auth context/client and must handle token refresh/logout consistently.
 - User-facing text is localized; do not introduce hardcoded Portuguese or English strings in pages/components.
+- `lib/format.ts` owns Kwanza (`formatKz`) and clinic date formatting; `lib/use-remote-options.ts` merges server search results into selector options.
 - Form dropdowns use the shared portalled `FormSelect`; do not reintroduce native `<select>` controls in routed workflows.
 - Keep routing and permission-aware visibility coherent with the backend roles.
 - Users with `must_change_password` are routed only to password change until activation; `401`, forced-change `403`, conflict `409`, and validation `422` need intentional UI handling.
