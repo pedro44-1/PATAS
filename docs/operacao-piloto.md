@@ -70,4 +70,6 @@ Depois do restauro, confirme que um administrador inicia sessão, que donos/anim
 
 Nunca coloque `VENDAS_API_KEY` no frontend, documentação, logs ou base de dados. Uma falha externa mantém o pedido em rascunho, regista apenas uma mensagem segura e permite repetir com a mesma chave idempotente. O modo TRAINING não tem validade fiscal nem comunicação AGT.
 
+Para que as FT passem a pagas sem intervenção, ative `BILLING_RECONCILE_ENABLED=true` (e ajuste `BILLING_RECONCILE_INTERVAL_SECONDS` e `VENDAS_PAID_STATES` aos estados reais do Vendas). O serviço `billing-reconciler` arranca com o Compose; com a flag desligada fica inativo. Na página de Faturas, "Verificar pagamento" faz a mesma reconciliação a pedido. Confirme no ensaio que uma FT paga no Vendas aparece como paga no PATAS.
+
 O subtotal mostrado pelo PATAS é provisório. O Vendas é a autoridade para IVA, retenções e total fiscal. Uma cotação expirada ou alterada deve ser recalculada antes de cobrar ou emitir; o PATAS nunca confirma pagamento apenas com base no subtotal local.

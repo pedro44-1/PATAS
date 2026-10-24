@@ -475,7 +475,8 @@
       "markPaidHint": "Mark as paid",
       "openDocument": "Open issued document",
       "retry": "Retry emission",
-      "cancel": "Cancel draft"
+      "cancel": "Cancel draft",
+      "checkPayment": "Check payment"
     },
     "search": "Search by number, customer or owner",
     "sync": {
@@ -485,7 +486,8 @@
       "title": "Issue fiscal document?",
       "retryTitle": "Retry the pending emission?",
       "description": "Issuing in Vendas cannot be undone. Check the customer and total before continuing."
-    }
+    },
+    "reconcileError": "Could not check the payment in Vendas."
   },
   "clinical": {
     "timeline": {
@@ -661,6 +663,11 @@
       "save": "The encounter could not be saved.",
       "complete": "The appointment could not be completed.",
       "notFound": "Appointment or animal not found."
+    },
+    "correction": {
+      "label": "Correction reason",
+      "hint": "This visit is completed. Every change is recorded in the audit log with the reason given.",
+      "required": "Enter the correction reason before saving."
     }
   },
   "common": {

@@ -1,4 +1,4 @@
-﻿import json
+import json
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
@@ -9,7 +9,7 @@ from src.models.audit_log import AuditLog
 def audit(
     db: Session,
     clinic_id: int,
-    user_id: int,
+    user_id: int | None,
     action: str,
     resource: str,
     resource_id: int | None = None,

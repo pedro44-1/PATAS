@@ -10,6 +10,7 @@ export interface UserResponse {
   role: UserRole;
   clinic_name: string;
   must_change_password: boolean;
+  is_active: boolean;
 }
 
 export interface ClinicRegistration {

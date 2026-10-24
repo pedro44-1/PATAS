@@ -13,6 +13,8 @@ Core provides shared infrastructure to all application layers. It does not own r
 - Read settings from environment-backed configuration and fail safely for missing production secrets.
 - Use the configured SQLAlchemy session factory and dependency lifecycle.
 - JWT access/refresh token rules, blacklist behavior, password hashing, and permission dependencies are centralized here. Protected dependencies accept `type=access`; refresh always reloads the database identity.
+- Tokens carry the user's `tv` (token version); access and refresh are rejected when it differs from `users.token_version` or the user is inactive. Password change and deactivation increment the version. Refresh consumption is atomic (`blacklist_token_if_absent`).
+- `pagination.py` owns the shared `Skip`/`Limit` query types (`limit` 1..200).
 - Temporary-password accounts may only use identity, password-change, and logout routes until `must_change_password` is cleared.
 - `Africa/Luanda` calendar boundaries are centralized in `timezones.py`; database datetimes remain UTC-naive for the existing SQLAlchemy contract.
 - Security-sensitive logging must not expose passwords, tokens, encryption keys, or other credentials.

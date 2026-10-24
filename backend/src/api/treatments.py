@@ -9,6 +9,7 @@ from src.models.appointment import Appointment
 from src.models.treatment import Treatment
 from src.models.user import User, UserRole
 from src.schemas.treatment import TreatmentCreate, TreatmentResponse, TreatmentUpdate
+from src.services.appointment_lifecycle import clinical_correction_reason
 from src.services.audit import audit
 
 router = APIRouter()
@@ -59,6 +60,7 @@ def create_treatment(
         raise HTTPException(status_code=404, detail="Consulta não encontrada")
     if db.query(Treatment.id).filter(Treatment.appointment_id == appointment.id).first():
         raise HTTPException(status_code=409, detail="Esta consulta já tem um tratamento registado")
+    clinical_correction_reason(appointment, current_user.role, None, has_existing_record=False)
     _validate_referring_vet(db, current_user.clinic_id, data.referring_vet_id)
 
     treatment = Treatment(clinic_id=current_user.clinic_id, **data.model_dump())
@@ -72,7 +74,7 @@ def create_treatment(
         action="CREATE",
         resource="treatment",
         resource_id=treatment.id,
-        details={"appointment_id": treatment.appointment_id, "diagnosis": treatment.diagnosis},
+        details={"appointment_id": treatment.appointment_id},
         ip_address=request.client.host if request else None,
     )
     return treatment
@@ -108,6 +110,9 @@ def update_treatment(
     if not t:
         raise HTTPException(status_code=404, detail="Tratamento não encontrado")
     updates = data.model_dump(exclude_unset=True)
+    correction_reason = clinical_correction_reason(
+        t.appointment, current_user.role, updates.pop("correction_reason", None), has_existing_record=True,
+    )
     _validate_referring_vet(db, current_user.clinic_id, updates.get("referring_vet_id", t.referring_vet_id))
     for key, value in updates.items():
         setattr(t, key, value)
@@ -120,7 +125,10 @@ def update_treatment(
         action="UPDATE",
         resource="treatment",
         resource_id=t.id,
-        details=updates,
+        details={
+            "fields": sorted(updates),
+            **({"correction_reason": correction_reason} if correction_reason else {}),
+        },
         ip_address=request.client.host if request else None,
     )
     return t

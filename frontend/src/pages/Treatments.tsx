@@ -94,6 +94,7 @@ export default function Treatments() {
   const [dictationTarget, setDictationTarget] = useState<DictationField | null>(null);
   const [dictationError, setDictationError] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
   const [appointmentFormError, setAppointmentFormError] = useState("");
 
   function load() {
@@ -135,8 +136,12 @@ export default function Treatments() {
     setShowForm(true);
   }
 
+  const editingAppointment = editing ? appointments.find((item) => item.id === editing.appointment_id) : undefined;
+  const editingCompleted = Boolean(editing && (!editingAppointment || editingAppointment.status === "completed"));
+
   function openEdit(treatment: Treatment) {
     setEditing(treatment);
+    setCorrectionReason("");
     setForm({
       appointment_id: treatment.appointment_id,
       diagnosis: treatment.diagnosis ?? "",
@@ -152,7 +157,10 @@ export default function Treatments() {
     setFormError("");
     try {
       if (editing) {
-        await treatmentsApi.update(editing.id, form);
+        await treatmentsApi.update(editing.id, {
+          ...form,
+          correction_reason: editingCompleted && correctionReason.trim() ? correctionReason.trim() : undefined,
+        });
       } else {
         await treatmentsApi.create(form);
       }
@@ -377,6 +385,13 @@ export default function Treatments() {
 
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <FormError message={formError} />
+              {editingCompleted && (
+                <div className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <Label htmlFor="treatment-correction-reason" className="text-xs font-semibold text-amber-900">{t("clinicalAppointment.correction.label")}</Label>
+                  <Input id="treatment-correction-reason" value={correctionReason} required={editingAppointment?.status === "completed"} maxLength={500} onChange={(event) => setCorrectionReason(event.target.value)} />
+                  <p className="text-xs text-amber-800">{t("clinicalAppointment.correction.hint")}</p>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <Label className="text-xs font-semibold text-dark-600">{t("treatments.form.appointment")} *</Label>

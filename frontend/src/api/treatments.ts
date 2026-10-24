@@ -29,6 +29,6 @@ export const treatmentsApi = {
     api.get<Treatment[]>("/treatments/", { params: appointmentId ? { appointment_id: appointmentId } : {} }),
   create: (data: TreatmentCreate) =>
     api.post<Treatment>("/treatments/", data),
-  update: (id: number, data: Partial<TreatmentCreate>) =>
+  update: (id: number, data: Partial<TreatmentCreate> & { correction_reason?: string }) =>
     api.patch<Treatment>(`/treatments/${id}`, data),
 };

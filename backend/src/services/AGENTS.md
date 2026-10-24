@@ -21,6 +21,8 @@ Services encapsulate side effects that should not be duplicated in routers. They
 - Service operations must preserve clinic ownership and avoid leaking secrets or personal data into logs.
 - Clinical catalogue seeding must be repeatable, clinic-scoped, and safe for existing historical records.
 - Overlap checks treat stored appointment instants as naive UTC (`stored_utc`) and only incoming API values as Luanda local time when they lack an offset (`utc_naive`).
+- `billing_reconciliation.py` is the only path that promotes an issued FT to `paid`, from the provider state (`VENDAS_PAID_STATES`); the API endpoint and the background job share it.
+- `ensure_active_subject` blocks check-in, call, start, clinical writes and invoicing for appointments whose pet or owner is archived; `clinical_correction_reason` enforces terminal-state clinical rules (cancelled/no-show blocked, completed requires a vet/admin correction reason).
 - `appointment_lifecycle.py` is the single transition authority for appointments and linked waiting-room entries; transitions must be atomic and role-aware.
 
 ## Work Guidance

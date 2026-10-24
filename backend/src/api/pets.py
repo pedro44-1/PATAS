@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session, joinedload
 
 from src.core.database import get_db
-from src.core.deps import CurrentUser, get_current_user, require_permission
+from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
 from src.models.appointment import Appointment
-from src.models.clinical_exam import ClinicalExamFinding, ClinicalExamObservation
+from src.models.clinical_exam import ClinicalExamFinding, ClinicalExamObservation, ExamFindingStatus
 from src.models.medication import Medication
 from src.models.owner import Owner
 from src.models.pet import Pet
@@ -78,6 +78,7 @@ def get_pet_history(
                         "note": observation.note,
                     }
                     for observation in appointment.exam_observations
+                    if observation.status != ExamFindingStatus.NOT_EVALUATED.value
                 ],
             }
             for appointment in appointments
@@ -140,7 +141,7 @@ def list_pets(
     q: str | None = None,
     owner_id: int | None = None,
     include_archived: bool = False,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("pet:read")),
     db: Session = Depends(get_db),
 ):
     query = db.query(Pet).options(joinedload(Pet.owner)).filter(Pet.clinic_id == current_user.clinic_id)
@@ -165,7 +166,7 @@ def list_pets(
 @router.post("/", response_model=PetResponse)
 def create_pet(
     data: PetCreate,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("pet:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):
@@ -197,7 +198,7 @@ def create_pet(
 @router.get("/{pet_id}", response_model=PetResponse)
 def get_pet(
     pet_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("pet:read")),
     db: Session = Depends(get_db),
 ):
     pet = db.query(Pet).filter(
@@ -212,7 +213,7 @@ def get_pet(
 def update_pet(
     pet_id: int,
     data: PetUpdate,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("pet:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):
@@ -245,7 +246,7 @@ def update_pet(
 @router.delete("/{pet_id}")
 def delete_pet(
     pet_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("pet:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):

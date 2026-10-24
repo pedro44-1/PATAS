@@ -46,6 +46,13 @@ def mock_redis():
         _blacklist.add(jti)
         return True
     cache_service.blacklist_token = mock_blacklist_token
+
+    async def mock_blacklist_token_if_absent(jti, ttl):
+        if jti in _blacklist:
+            return False
+        _blacklist.add(jti)
+        return True
+    cache_service.blacklist_token_if_absent = mock_blacklist_token_if_absent
     
     # Mock check_rate_limit to always succeed (avoid cross-test rate limit accumulation)
     async def mock_check_rate_limit(key, max_attempts, window):

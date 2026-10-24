@@ -193,3 +193,58 @@ def test_temporary_password_change_and_logout_revoke_both_tokens(client, admin_h
     assert client.post("/api/v1/auth/refresh", json={
         "refresh_token": new_tokens["refresh_token"],
     }).status_code == 401
+
+
+def _login(client, email="vet@test.com", password="Password1"):
+    return client.post("/api/v1/auth/login", json={"email": email, "password": password}).json()
+
+
+def test_password_change_revokes_other_sessions(client, vet_user):
+    other_session = _login(client)
+    current = _login(client)
+    headers = {"Authorization": f"Bearer {current['access_token']}"}
+    changed = client.post("/api/v1/auth/change-password", headers=headers, json={
+        "current_password": "Password1",
+        "new_password": "Permanent2",
+        "refresh_token": current["refresh_token"],
+    })
+    assert changed.status_code == 200
+
+    stale = {"Authorization": f"Bearer {other_session['access_token']}"}
+    assert client.get("/api/v1/auth/me", headers=stale).status_code == 401
+    assert client.post("/api/v1/auth/refresh", json={"refresh_token": other_session["refresh_token"]}).status_code == 401
+    fresh = {"Authorization": f"Bearer {changed.json()['access_token']}"}
+    assert client.get("/api/v1/auth/me", headers=fresh).status_code == 200
+
+
+def test_refresh_token_is_single_use(client, vet_user):
+    tokens = _login(client)
+    first = client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    second = client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+    assert first.status_code == 200
+    assert second.status_code == 401
+
+
+def test_admin_deactivation_revokes_sessions_and_blocks_login(client, admin_headers, vet_user, admin_user):
+    session = _login(client)
+    headers = {"Authorization": f"Bearer {session['access_token']}"}
+    assert client.get("/api/v1/auth/me", headers=headers).status_code == 200
+
+    response = client.patch(f"/api/v1/users/{vet_user.id}/status", headers=admin_headers, json={"is_active": False})
+    assert response.status_code == 200
+    assert response.json()["is_active"] is False
+    assert client.get("/api/v1/auth/me", headers=headers).status_code == 401
+    assert client.post("/api/v1/auth/login", json={"email": "vet@test.com", "password": "Password1"}).status_code == 403
+    assert client.patch(
+        f"/api/v1/users/{admin_user.id}/status", headers=admin_headers, json={"is_active": False}
+    ).status_code == 400
+
+    client.patch(f"/api/v1/users/{vet_user.id}/status", headers=admin_headers, json={"is_active": True})
+    assert client.post("/api/v1/auth/login", json={"email": "vet@test.com", "password": "Password1"}).status_code == 200
+
+
+def test_non_admin_cannot_change_user_status(client, vet_headers, receptionist_user):
+    response = client.patch(
+        f"/api/v1/users/{receptionist_user.id}/status", headers=vet_headers, json={"is_active": False}
+    )
+    assert response.status_code == 403

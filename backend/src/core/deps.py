@@ -77,6 +77,11 @@ async def get_current_user_unrestricted(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Utilizador não encontrado",
         )
+    if not user.is_active or str(payload.get("tv", "0")) != str(user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessão revogada",
+        )
 
     role_enum = UserRole(user.role)
     return CurrentUser(

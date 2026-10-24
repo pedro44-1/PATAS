@@ -431,7 +431,8 @@
       "markPaidHint": "Marcar como paga",
       "openDocument": "Abrir documento emitido",
       "retry": "Repetir emissão",
-      "cancel": "Cancelar rascunho"
+      "cancel": "Cancelar rascunho",
+      "checkPayment": "Verificar pagamento"
     },
     "search": "Pesquisar por número, cliente ou dono",
     "sync": {
@@ -441,7 +442,8 @@
       "title": "Emitir documento fiscal?",
       "retryTitle": "Repetir a emissão pendente?",
       "description": "A emissão no Vendas é irreversível. Confirme o cliente e o total antes de continuar."
-    }
+    },
+    "reconcileError": "Não foi possível verificar o pagamento no Vendas."
   },
   "clinical": {
     "timeline": {
@@ -617,6 +619,11 @@
       "save": "Não foi possível guardar o atendimento.",
       "complete": "Não foi possível concluir a consulta.",
       "notFound": "Consulta ou animal não encontrado."
+    },
+    "correction": {
+      "label": "Motivo da correção",
+      "hint": "Este atendimento está concluído. Cada alteração fica registada na auditoria com o motivo indicado.",
+      "required": "Indique o motivo da correção antes de guardar."
     }
   },
   "settings": {

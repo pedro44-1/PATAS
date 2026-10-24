@@ -388,7 +388,7 @@ curl -X GET "http://localhost:8000/api/v1/treatments/?appointment_id=1" \
   -H "Authorization: Bearer <token>"
 ```
 
-Requires `treatment:read` (receptionists receive `403`). An appointment has at most one treatment; a second create returns `409`.
+Requires `treatment:read` (receptionists receive `403`). Clinical writes (`PATCH /treatments/{id}` and `PUT /appointments/{id}/clinical-record`) are rejected for cancelled/no-show appointments (`409`); changing an existing record of a completed appointment requires `correction_reason` from a vet/admin (`422`/`403` otherwise), is audited with that reason and marks removed exam findings as `not-evaluated` instead of deleting them. Appointments whose pet or owner is archived cannot be checked in, called, started, documented or invoiced (`409`); they can still be cancelled. An appointment has at most one treatment; a second create returns `409`.
 
 ### Create (vet/admin only)
 
@@ -503,6 +503,8 @@ O payload externo serializa quantidades, preços, descontos e pagamentos como st
 
 `VAT_PROFILE_REQUIRED` pede configuração comercial no Vendas. `QUOTE_NOT_FOUND`, `QUOTE_EXPIRED`, `QUOTE_MISMATCH` e `QUOTE_STALE` invalidam a cotação local e exigem nova prévia. Um timeout, erro de transporte, `5xx`, `408`, `409`, `425` ou `429` na emissão mantém a chave e reutiliza exatamente o mesmo corpo na repetição, para evitar duplicação. Outras rejeições `4xx` são definitivas: limpam a prévia e a chave, guardam `last_sync_error` e permitem uma nova prévia.
 
+Uma FT emitida fica `sent` até o Vendas a reportar como paga. `POST /api/v1/invoices/{id}/reconcile` (permissão `invoice:read`) consulta o estado no Vendas e passa a fatura a `paid` quando o estado está em `VENDAS_PAID_STATES` (por omissão `PAID,SETTLED`); devolve `409` se o documento ainda não foi emitido. `GET /{id}/sync-status` mantém-se por compatibilidade e usa a mesma reconciliação. O serviço `billing-reconciler` (`python -m scripts.reconcile_invoices --loop`) repete a reconciliação das FT pendentes a cada `BILLING_RECONCILE_INTERVAL_SECONDS` quando `BILLING_RECONCILE_ENABLED=true`, com um lock Redis para não correr em paralelo. A prévia volta a ler os dados atuais da clínica e do dono, e a data do documento é o dia corrente em Luanda.
+
 Variáveis do backend: `BILLING_PROVIDER`, `VENDAS_BASE_URL`, `VENDAS_API_KEY`, `VENDAS_OPERATION_TYPE`, `VENDAS_DEFAULT_VAT_PROFILE_CODE`, `VENDAS_CASH_SESSION_ID` e `VENDAS_REQUEST_TIMEOUT_SECONDS`. O modo atual do Vendas é `TRAINING` e não produz documentos com validade fiscal.
 
 ### Dados da clínica para faturação
@@ -567,6 +569,21 @@ curl -X PATCH http://localhost:8000/api/v1/users/2/role \
   -H "Content-Type: application/json" \
   -d '{"role": "vet"}'
 ```
+
+### Ativar/desativar utilizador
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/users/2/status \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"is_active": false}'
+```
+
+Desativar revoga imediatamente todas as sessões do utilizador e bloqueia o login (`403`). Um administrador não se pode desativar (`400`). As respostas de utilizador incluem `is_active`.
+
+### Sessões
+
+Os tokens transportam a versão de sessão do utilizador (`tv`). Mudar a palavra-passe ou desativar a conta incrementa essa versão e invalida todos os tokens anteriores (`401 Sessão revogada`). Cada refresh token só pode ser usado uma vez, de forma atómica.
 
 Roles: `admin`, `vet`, `receptionist`
 

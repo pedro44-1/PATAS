@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.models.appointment import AppointmentStatus
+from src.schemas.common import reject_null
 
 
 class AppointmentCreate(BaseModel):
@@ -27,6 +28,11 @@ class AppointmentUpdate(BaseModel):
     notes: str | None = Field(None, max_length=2000)
     weight: float | None = Field(None, ge=0)
     service_type_id: int | None = None
+
+    @field_validator("pet_id", "vet_id", "scheduled_at", "duration_min", mode="before")
+    @classmethod
+    def _reject_null(cls, value):
+        return reject_null(value)
 
 
 class AppointmentResponse(BaseModel):

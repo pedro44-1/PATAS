@@ -1,4 +1,4 @@
-﻿import os
+import os
 from typing import Any
 
 from pydantic import SecretStr
@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     VENDAS_OPERATION_TYPE: str = ""
     VENDAS_DEFAULT_VAT_PROFILE_CODE: str = ""
     VENDAS_CASH_SESSION_ID: str = ""
+    VENDAS_PAID_STATES: str = "PAID,SETTLED"
+    BILLING_RECONCILE_ENABLED: bool = False
+    BILLING_RECONCILE_INTERVAL_SECONDS: int = 600
+
+    @property
+    def VENDAS_PAID_STATES_SET(self) -> set[str]:
+        return {state.strip().upper() for state in self.VENDAS_PAID_STATES.split(",") if state.strip()}
 
     @property
     def CORS_ORIGINS_LIST(self) -> list[str]:

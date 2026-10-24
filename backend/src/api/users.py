@@ -7,7 +7,7 @@ from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
 from src.core.security import hash_password
 from src.models.user import User
-from src.schemas.user import UserCreate, UserResponse, UserRoleUpdate
+from src.schemas.user import UserCreate, UserResponse, UserRoleUpdate, UserStatusUpdate
 from src.services.audit import audit
 
 router = APIRouter()
@@ -95,4 +95,37 @@ def update_user_role(
         details={"old_role": old_role.value, "new_role": user.role.value},
         ip_address=request.client.host if request else None,
     )
+    return user
+
+
+@router.patch("/{user_id}/status", response_model=UserResponse)
+def update_user_status(
+    user_id: int,
+    data: UserStatusUpdate,
+    current_user: CurrentUser = Depends(require_permission("user:write")),
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Não pode desativar a sua própria conta")
+    user = db.query(User).filter(
+        User.id == user_id, User.clinic_id == current_user.clinic_id
+    ).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilizador não encontrado")
+    if user.is_active != data.is_active:
+        user.is_active = data.is_active
+        user.token_version = (user.token_version or 0) + 1
+        db.commit()
+        db.refresh(user)
+        audit(
+            db,
+            clinic_id=current_user.clinic_id,
+            user_id=current_user.id,
+            action="UPDATE",
+            resource="user",
+            resource_id=user.id,
+            details={"is_active": user.is_active},
+            ip_address=request.client.host if request else None,
+        )
     return user

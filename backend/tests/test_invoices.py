@@ -714,3 +714,54 @@ def test_list_invoices_filters_by_pet_and_query(client, vet_headers, invoice, pe
     assert other_pet.json() == []
     by_owner_name = client.get("/api/v1/invoices/", headers=vet_headers, params={"q": "Test Owner"})
     assert [item["id"] for item in by_owner_name.json()] == [invoice.id]
+
+
+def test_preview_refreshes_customer_snapshot_from_owner(client, vet_headers, invoice, owner, db_session):
+    owner.nif = "5499999999"
+    db_session.commit()
+    preview = client.post(f"/api/v1/invoices/{invoice.id}/preview", headers=vet_headers)
+    assert preview.status_code == 200
+    assert preview.json()["customer_nif"] == "5499999999"
+
+
+def test_reconcile_marks_issued_ft_paid(client, vet_headers, invoice, monkeypatch):
+    from src.services.billing import MockBillingAdapter
+
+    assert client.post(f"/api/v1/invoices/{invoice.id}/preview", headers=vet_headers).status_code == 200
+    issued = client.post(f"/api/v1/invoices/{invoice.id}/sync", headers=vet_headers)
+    assert issued.json()["status"] == "sent"
+
+    class PaidAdapter(MockBillingAdapter):
+        def get_status(self, external_reference):
+            return "paid"
+
+    monkeypatch.setattr("src.api.invoices.get_billing_adapter", lambda: PaidAdapter())
+    reconciled = client.post(f"/api/v1/invoices/{invoice.id}/reconcile", headers=vet_headers)
+    assert reconciled.status_code == 200
+    assert reconciled.json()["status"] == "paid"
+    assert reconciled.json()["provider_status"] == "paid"
+
+
+def test_reconcile_requires_issued_document(client, receptionist_headers, invoice):
+    response = client.post(f"/api/v1/invoices/{invoice.id}/reconcile", headers=receptionist_headers)
+    assert response.status_code == 409
+
+
+def test_reconciliation_job_only_promotes_paid_ft(db_session, invoice):
+    from src.models.invoice import InvoiceStatus
+    from src.services.billing import MockBillingAdapter
+    from src.services.billing_reconciliation import reconcile_pending_invoices
+
+    invoice.status = InvoiceStatus.SENT
+    invoice.external_reference = "mock-patas-job"
+    db_session.commit()
+
+    class Adapter(MockBillingAdapter):
+        def get_status(self, external_reference):
+            return "SETTLED"
+
+    result = reconcile_pending_invoices(db_session, adapter=Adapter())
+    db_session.refresh(invoice)
+    assert result == {"checked": 1, "paid": 1, "failed": 0}
+    assert invoice.status == InvoiceStatus.PAID
+    assert invoice.paid_at is not None

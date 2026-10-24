@@ -23,7 +23,7 @@ def get_clinic(current_user: CurrentUser = Depends(get_current_user), db: Sessio
 @router.patch("/me", response_model=ClinicResponse)
 def update_clinic(
     data: ClinicUpdate,
-    current_user: CurrentUser = Depends(require_permission("user:manage")),
+    current_user: CurrentUser = Depends(require_permission("user:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):

@@ -1,7 +1,7 @@
-﻿import enum
+import enum
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String, true
 from sqlalchemy.orm import relationship
 
 from src.core.database import Base
@@ -27,6 +27,8 @@ class User(Base):
         default=UserRole.RECEPTIONIST,
     )
     must_change_password = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True, server_default=true())
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
     clinic = relationship("Clinic", back_populates="users")

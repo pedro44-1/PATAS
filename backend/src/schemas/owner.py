@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from src.schemas.common import OptionalEmail, OptionalText
+from src.schemas.common import OptionalEmail, OptionalText, reject_null
 
 
 class OwnerCreate(BaseModel):
@@ -21,6 +21,11 @@ class OwnerUpdate(BaseModel):
     address: OptionalText = Field(None, max_length=500)
     nif: OptionalText = Field(None, max_length=30)
     notes: OptionalText = Field(None, max_length=1000)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _reject_null(cls, value):
+        return reject_null(value)
 
 
 class OwnerResponse(BaseModel):

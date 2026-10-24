@@ -9,6 +9,12 @@ def blank_to_none(value: Any) -> Any:
     return value
 
 
+def reject_null(value: Any) -> Any:
+    if value is None:
+        raise ValueError("Este campo não pode ser nulo")
+    return value
+
+
 OptionalText = Annotated[str | None, BeforeValidator(blank_to_none)]
 OptionalEmail = Annotated[EmailStr | None, BeforeValidator(blank_to_none)]
 

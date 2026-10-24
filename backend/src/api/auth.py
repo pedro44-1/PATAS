@@ -37,6 +37,7 @@ def _claims(user: User) -> dict[str, str]:
         "sub": str(user.id),
         "clinic_id": str(user.clinic_id),
         "role": role,
+        "tv": str(user.token_version or 0),
     }
 
 
@@ -113,6 +114,8 @@ async def login(data: UserLogin, db: Session = Depends(get_db), request: Request
         )
 
     user = db.query(User).filter(User.email == data.email).first()
+    if user and not user.is_active:
+        raise HTTPException(status_code=403, detail="Esta conta está desativada; contacte o administrador")
     if not user or not verify_password(data.password, user.password_hash):
         if user:
             audit(
@@ -144,10 +147,9 @@ async def refresh_token(data: TokenRefresh, db: Session = Depends(get_db), reque
     ip = request.client.host if request else "unknown"
     payload = _decode_typed_token(data.refresh_token, "refresh")
 
-    if await cache.is_token_blacklisted(payload.get("jti")):
+    ttl = max(1, int(payload.get("exp", 0)) - int(time.time()))
+    if not await cache.blacklist_token_if_absent(payload.get("jti"), ttl):
         raise HTTPException(status_code=401, detail="Refresh token já utilizado")
-
-    await _blacklist_payload(payload)
 
     try:
         user_id = int(payload["sub"])
@@ -156,6 +158,8 @@ async def refresh_token(data: TokenRefresh, db: Session = Depends(get_db), reque
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="Utilizador não encontrado")
+    if not user.is_active or str(payload.get("tv", "0")) != str(user.token_version or 0):
+        raise HTTPException(status_code=401, detail="Sessão revogada")
     audit(
         db,
         clinic_id=user.clinic_id,
@@ -178,6 +182,7 @@ def get_me(current_user: CurrentUser = Depends(get_current_user_unrestricted)):
         role=current_user.role,
         clinic_name=current_user.clinic_name,
         must_change_password=current_user.must_change_password,
+        is_active=True,
     )
 
 
@@ -227,6 +232,7 @@ async def change_password(
 
     user.password_hash = hash_password(data.new_password)
     user.must_change_password = False
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
     db.refresh(user)
     await _blacklist_payload(access_payload)

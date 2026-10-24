@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,7 @@ class TreatmentUpdate(BaseModel):
     anamnesis: str | None = Field(None, max_length=10000)
     consultation_type: str | None = Field(None, min_length=1, max_length=50)
     referring_vet_id: int | None = None
+    correction_reason: str | None = Field(None, max_length=500)
 
 
 class TreatmentResponse(BaseModel):

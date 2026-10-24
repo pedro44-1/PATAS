@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from src.schemas.common import OptionalEmail, OptionalText
+from src.schemas.common import OptionalEmail, OptionalText, reject_null
 
 
 class ClinicCreate(BaseModel):
@@ -31,3 +31,8 @@ class ClinicUpdate(BaseModel):
     email: OptionalEmail = None
     nif: OptionalText = Field(None, max_length=30)
     billing_store_external_id: OptionalText = Field(None, max_length=100)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _reject_null(cls, value):
+        return reject_null(value)

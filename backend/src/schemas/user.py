@@ -53,6 +53,7 @@ class UserResponse(BaseModel):
     role: UserRole
     clinic_name: str
     must_change_password: bool
+    is_active: bool = True
 
     class Config:
         from_attributes = True
@@ -86,3 +87,7 @@ class PasswordChange(BaseModel):
 
 class UserRoleUpdate(BaseModel):
     role: UserRole
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool

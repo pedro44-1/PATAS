@@ -23,6 +23,8 @@ Routers translate HTTP requests into validated domain operations and responses. 
 - FT and FR require a valid Vendas preview. Quote expiry or mismatch clears the quote and requires a new preview; FR tenders must equal the provider `payable`.
 - Repeating sync for an already synchronized FR or FT returns the stored document without another provider call, including after FR becomes paid.
 - Successful billing previews are audited with resource/quote identifiers and state only; never copy the quote snapshot or personal data into audit logs.
+- Owners, pets, appointments and invoices use their `resource:read`/`resource:write` permissions; clinic settings require `user:write`.
+- Admins activate/deactivate users through `PATCH /users/{id}/status`; self-deactivation is rejected.
 - Public registration creates a clinic/admin; team creation is admin-only and produces a forced temporary-password flow.
 - Owners and pets are archived rather than deleted; treatments and invoices reject physical deletion.
 - Keep waiting-room transitions synchronized with the linked appointment and require cancellation reasons.

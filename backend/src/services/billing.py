@@ -8,6 +8,7 @@ from uuid import NAMESPACE_URL, uuid5
 import httpx
 
 from src.core.config import settings
+from src.core.timezones import local_today
 from src.models.invoice import Invoice, InvoiceDocumentType, InvoiceLine
 
 
@@ -201,7 +202,7 @@ def build_billing_preview_payload(invoice: Invoice) -> BillingPreviewPayload:
     return BillingPreviewPayload(
         external_id=external_id,
         store_external_id=invoice.issuer_store_external_id,
-        document_date=(invoice.created_at or datetime.now(UTC)).date().isoformat(),
+        document_date=local_today().isoformat(),
         lines=_billing_lines(invoice),
     )
 
@@ -250,7 +251,7 @@ def build_billing_payload(invoice: Invoice) -> BillingInvoicePayload:
         external_id=external_id,
         store_external_id=invoice.issuer_store_external_id,
         document_type=invoice.document_type.value,
-        document_date=(invoice.created_at or datetime.now(UTC)).date().isoformat(),
+        document_date=local_today().isoformat(),
         due_date=invoice.due_at.date().isoformat() if invoice.due_at else None,
         external_reference=f"appointment-{invoice.appointment_id}" if invoice.appointment_id else None,
         notes=invoice.description,
@@ -350,6 +351,10 @@ class VendasBillingAdapter:
         )
         response.raise_for_status()
         return str(response.json()["invoice"].get("state", "unknown"))
+
+
+def is_paid_provider_state(state: str | None) -> bool:
+    return bool(state) and state.strip().upper() in settings.VENDAS_PAID_STATES_SET
 
 
 def get_billing_adapter() -> BillingAdapter:

@@ -76,6 +76,7 @@ services:
       VENDAS_OPERATION_TYPE: ${VENDAS_OPERATION_TYPE:-}
       VENDAS_DEFAULT_VAT_PROFILE_CODE: ${VENDAS_DEFAULT_VAT_PROFILE_CODE:-}
       VENDAS_CASH_SESSION_ID: ${VENDAS_CASH_SESSION_ID:-}
+      VENDAS_PAID_STATES: ${VENDAS_PAID_STATES:-PAID,SETTLED}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -87,6 +88,35 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    volumes:
+      - ./backend:/app
+
+  billing-reconciler:
+    image: patas-backend:local
+    container_name: patas_billing_reconciler
+    restart: unless-stopped
+    command: ["python", "-m", "scripts.reconcile_invoices", "--loop"]
+    environment:
+      DATABASE_URL: postgresql://patas:${POSTGRES_PASSWORD:-patas_dev_password}@db:5432/patas
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me-in-production}
+      APP_ENV: ${APP_ENV:-development}
+      BILLING_PROVIDER: ${BILLING_PROVIDER:-mock}
+      VENDAS_BASE_URL: ${VENDAS_BASE_URL:-}
+      VENDAS_API_KEY: ${VENDAS_API_KEY:-}
+      VENDAS_REQUEST_TIMEOUT_SECONDS: ${VENDAS_REQUEST_TIMEOUT_SECONDS:-10}
+      VENDAS_OPERATION_TYPE: ${VENDAS_OPERATION_TYPE:-}
+      VENDAS_DEFAULT_VAT_PROFILE_CODE: ${VENDAS_DEFAULT_VAT_PROFILE_CODE:-}
+      VENDAS_CASH_SESSION_ID: ${VENDAS_CASH_SESSION_ID:-}
+      VENDAS_PAID_STATES: ${VENDAS_PAID_STATES:-PAID,SETTLED}
+      BILLING_RECONCILE_ENABLED: ${BILLING_RECONCILE_ENABLED:-false}
+      BILLING_RECONCILE_INTERVAL_SECONDS: ${BILLING_RECONCILE_INTERVAL_SECONDS:-600}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     volumes:
       - ./backend:/app
 

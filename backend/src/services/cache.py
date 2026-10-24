@@ -1,4 +1,4 @@
-﻿import json
+import json
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -67,6 +67,11 @@ class CacheService:
 
     async def blacklist_token(self, jti: str, expires_in: int) -> bool:
         return await self.set(f"blacklist:{jti}", "1", expires_in)
+
+    async def blacklist_token_if_absent(self, jti: str, expires_in: int) -> bool:
+        if not self._redis:
+            return True
+        return bool(await self._redis.set(f"blacklist:{jti}", "1", ex=expires_in, nx=True))
 
     async def is_token_blacklisted(self, jti: str) -> bool:
         return await self.exists(f"blacklist:{jti}")

@@ -18,6 +18,9 @@ Models define persistence shape and relationship invariants. Alembic owns the du
 - Use archive flags for service and exam configuration so historical appointments and observations remain readable.
 - Owners and pets use `archived_at` and `archived_by_user_id`; archive never cascades to physical deletion.
 - Appointment intervals for active statuses are protected by the PostgreSQL GiST exclusion constraint in addition to the API pre-check.
+- Users carry `is_active` and `token_version`; deactivation is logical and never deletes the account.
+- An appointment has at most one non-cancelled invoice (`uq_invoices_active_appointment`, partial unique index) and at most one treatment (unique `treatments.appointment_id`).
+- `Appointment.subject_archived`, `pet_name`, `owner_name`, `vet_name` and `Pet.owner_name` are read-only properties for responses.
 - Use the canonical role and status values from the current models/schemas.
 - Model changes must be accompanied by a reviewed migration and relevant tests.
 

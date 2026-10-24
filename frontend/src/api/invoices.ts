@@ -19,4 +19,5 @@ export const invoicesApi = {
   update: (id: number, data: InvoiceUpdate) => api.patch<Invoice>(`/invoices/${id}`, data),
   preview: (id: number) => api.post<Invoice>(`/invoices/${id}/preview`),
   sync: (id: number) => api.post<Invoice>(`/invoices/${id}/sync`),
+  reconcile: (id: number) => api.post<Invoice>(`/invoices/${id}/reconcile`),
 };

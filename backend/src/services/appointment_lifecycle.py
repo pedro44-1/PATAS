@@ -75,6 +75,37 @@ def _require_clinical_role(role: UserRole | str) -> None:
         raise HTTPException(status_code=403, detail="Apenas veterinários podem iniciar ou concluir atendimentos")
 
 
+def ensure_active_subject(appointment: Appointment) -> None:
+    if appointment.subject_archived:
+        raise HTTPException(
+            status_code=409,
+            detail="O animal ou o dono desta consulta está arquivado; apenas é possível cancelar a consulta",
+        )
+
+
+def clinical_correction_reason(
+    appointment: Appointment,
+    actor_role: UserRole | str,
+    correction_reason: str | None,
+    *,
+    has_existing_record: bool,
+) -> str | None:
+    status = AppointmentStatus(appointment.status)
+    if status in {AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW}:
+        raise HTTPException(status_code=409, detail="Consultas canceladas ou faltas não aceitam registo clínico")
+    if status != AppointmentStatus.COMPLETED:
+        ensure_active_subject(appointment)
+        return None
+    if not has_existing_record:
+        return None
+    if _role_value(actor_role) not in {UserRole.VET.value, UserRole.ADMIN.value}:
+        raise HTTPException(status_code=403, detail="Apenas veterinários podem corrigir registos clínicos concluídos")
+    reason = (correction_reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=422, detail="Indique o motivo da correção do registo clínico concluído")
+    return reason
+
+
 def _validated_reason(status: AppointmentStatus | WaitingRoomStatus, reason: str | None) -> str | None:
     normalized = (reason or "").strip() or None
     if status in {AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW, WaitingRoomStatus.CANCELLED, WaitingRoomStatus.NO_SHOW} and not normalized:
@@ -96,6 +127,8 @@ def transition_appointment(
         raise HTTPException(status_code=409, detail="Transição de estado inválida para esta consulta")
     if next_status in {AppointmentStatus.IN_PROGRESS, AppointmentStatus.COMPLETED}:
         _require_clinical_role(actor_role)
+    if next_status == AppointmentStatus.IN_PROGRESS:
+        ensure_active_subject(appointment)
     normalized_reason = _validated_reason(next_status, reason)
 
     appointment.status = next_status
@@ -132,6 +165,8 @@ def transition_waiting_room(
         raise HTTPException(status_code=409, detail="Transição de estado inválida para esta entrada")
     if next_status in {WaitingRoomStatus.IN_PROGRESS, WaitingRoomStatus.COMPLETED}:
         _require_clinical_role(actor_role)
+    if next_status in {WaitingRoomStatus.CALLED, WaitingRoomStatus.IN_PROGRESS} and entry.appointment is not None:
+        ensure_active_subject(entry.appointment)
     normalized_reason = _validated_reason(next_status, reason)
 
     now = datetime.now(UTC).replace(tzinfo=None)

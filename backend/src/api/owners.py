@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
-from src.core.deps import CurrentUser, get_current_user
+from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
 from src.core.safe_update import safe_update
 from src.models.owner import Owner
@@ -23,7 +23,7 @@ def list_owners(
     limit: Limit = 100,
     q: str | None = None,
     include_archived: bool = False,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("owner:read")),
     db: Session = Depends(get_db),
 ):
     query = db.query(Owner).filter(Owner.clinic_id == current_user.clinic_id)
@@ -46,7 +46,7 @@ def list_owners(
 @router.post("/", response_model=OwnerResponse)
 def create_owner(
     data: OwnerCreate,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("owner:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):
@@ -70,7 +70,7 @@ def create_owner(
 @router.get("/{owner_id}", response_model=OwnerResponse)
 def get_owner(
     owner_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("owner:read")),
     db: Session = Depends(get_db),
 ):
     owner = db.query(Owner).filter(
@@ -85,7 +85,7 @@ def get_owner(
 def update_owner(
     owner_id: int,
     data: OwnerUpdate,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("owner:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):
@@ -116,7 +116,7 @@ def update_owner(
 @router.delete("/{owner_id}")
 def delete_owner(
     owner_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("owner:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):

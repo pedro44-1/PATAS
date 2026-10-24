@@ -11,6 +11,7 @@ Scripts are operational helpers, not API routes. They may use backend models/ser
 ## Local Contracts
 
 - Run from `backend` with the `src` package importable.
+- `reconcile_invoices.py` (`python -m scripts.reconcile_invoices [--loop]`) reconciles issued FT invoices with the provider under a Redis lock and idles when `BILLING_RECONCILE_ENABLED` is false.
 - Seed operations must be repeatable or clearly report their one-time assumptions.
 - Never print or embed production secrets, tokens, or real personal data.
 - Demo data must remain clearly synthetic and local-only.

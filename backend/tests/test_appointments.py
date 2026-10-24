@@ -299,3 +299,14 @@ def test_appointment_response_includes_related_names(client, vet_headers, appoin
     assert data["owner_name"] == owner.name
     assert data["vet_name"] == vet_user.name
     assert data["subject_archived"] is False
+
+
+def test_explicit_null_on_required_fields_is_rejected(client, vet_headers, appointment, owner, pet):
+    assert client.patch(
+        f"/api/v1/appointments/{appointment.id}", headers=vet_headers, json={"scheduled_at": None}
+    ).status_code == 422
+    assert client.patch(
+        f"/api/v1/appointments/{appointment.id}", headers=vet_headers, json={"duration_min": None}
+    ).status_code == 422
+    assert client.patch(f"/api/v1/owners/{owner.id}", headers=vet_headers, json={"name": None}).status_code == 422
+    assert client.patch(f"/api/v1/pets/{pet.id}", headers=vet_headers, json={"species": None}).status_code == 422

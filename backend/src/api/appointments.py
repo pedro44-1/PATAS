@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from src.core.database import get_db
-from src.core.deps import CurrentUser, get_current_user
+from src.core.deps import CurrentUser, require_permission
 from src.core.pagination import Limit, Skip
 from src.core.timezones import local_day_bounds, utc_naive
 from src.models.appointment import Appointment, AppointmentStatus
@@ -26,7 +26,7 @@ router = APIRouter()
 
 @router.get("/vets")
 def list_clinic_vets(
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("appointment:read")),
     db: Session = Depends(get_db),
 ):
     return db.query(User).filter(
@@ -72,7 +72,7 @@ def list_appointments(
     order: Literal["asc", "desc"] = "asc",
     skip: Skip = 0,
     limit: Limit = 100,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("appointment:read")),
     db: Session = Depends(get_db),
 ):
     query = db.query(Appointment).options(
@@ -120,7 +120,7 @@ def list_appointments(
 @router.post("/", response_model=AppointmentResponse)
 def create_appointment(
     data: AppointmentCreate,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("appointment:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):
@@ -171,7 +171,7 @@ def create_appointment(
 @router.get("/{appointment_id}", response_model=AppointmentResponse)
 def get_appointment(
     appointment_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("appointment:read")),
     db: Session = Depends(get_db),
 ):
     appt = db.query(Appointment).filter(
@@ -187,7 +187,7 @@ def get_appointment(
 def update_appointment(
     appointment_id: int,
     data: AppointmentUpdate,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("appointment:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):
@@ -264,7 +264,7 @@ def update_appointment(
 @router.delete("/{appointment_id}", response_model=AppointmentResponse)
 def delete_appointment(
     appointment_id: int,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("appointment:write")),
     db: Session = Depends(get_db),
     request: Request = None,
 ):

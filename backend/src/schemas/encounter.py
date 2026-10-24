@@ -27,6 +27,7 @@ class ClinicalRecordUpdate(BaseModel):
     referring_vet_id: int | None = None
     exam_findings: list[ExamObservationInput] = Field(default_factory=list)
     medications: list[ClinicalMedicationLine] = Field(default_factory=list)
+    correction_reason: str | None = Field(None, max_length=500)
 
 
 class ClinicalTreatmentResponse(BaseModel):

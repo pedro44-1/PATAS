@@ -76,4 +76,5 @@ export interface ClinicalRecordUpdate {
   referring_vet_id?: number;
   exam_findings: { finding_id: number; status: ExamFindingStatus; note?: string }[];
   medications: ClinicalMedicationLine[];
+  correction_reason?: string;
 }

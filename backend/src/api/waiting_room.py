@@ -20,6 +20,7 @@ from src.schemas.waiting_room import (
     WaitingRoomTransition,
 )
 from src.services.appointment_lifecycle import (
+    ensure_active_subject,
     ensure_no_appointment_conflict,
     transition_waiting_room,
 )
@@ -151,6 +152,7 @@ def create_waiting_entry(
         appointment = _appointment_or_404(db, current_user.clinic_id, data.appointment_id)
         if appointment.status != AppointmentStatus.SCHEDULED:
             raise HTTPException(status_code=409, detail="Apenas consultas agendadas podem entrar na fila")
+        ensure_active_subject(appointment)
         service_type = _service_type_or_422(db, current_user.clinic_id, data.service_type_id or appointment.service_type_id)
         if appointment.service_type_id is None:
             appointment.service_type_id = service_type.id

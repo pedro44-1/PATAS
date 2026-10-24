@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FormError } from "@/components/ui/form-error";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Calculator, ExternalLink, FileText, Plus, RotateCw, Search, Send, Trash2, X } from "lucide-react";
+import { AlertTriangle, Calculator, CheckCircle2, ExternalLink, FileText, Plus, RotateCw, Search, Send, Trash2, X } from "lucide-react";
 
 import { appointmentsApi, Appointment } from "@/api/appointments";
 import { apiErrorMessage } from "@/api/errors";
@@ -185,6 +185,7 @@ export default function Invoices() {
           {invoice.status === "draft" && !hasPendingEmission(invoice) && !hasValidQuote(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => handlePreview(invoice.id)}><Calculator className="mr-1 size-3.5" />{t("invoices.actions.preview")}</Button>}
           {invoice.status === "draft" && !hasPendingEmission(invoice) && hasValidQuote(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => setEmitTarget(invoice)}><Send className="mr-1 size-3.5" />{t("invoices.actions.send")}</Button>}
           {invoice.status === "draft" && !hasPendingEmission(invoice) && <Button size="icon-sm" variant="ghost" disabled={busyId === invoice.id} onClick={() => handleStatus(invoice.id, "cancelled")} aria-label={t("invoices.actions.cancel")}><X className="size-4" /></Button>}
+          {invoice.status === "sent" && invoice.external_reference && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => runRowAction(invoice.id, () => invoicesApi.reconcile(invoice.id), "invoices.reconcileError")}><CheckCircle2 className="mr-1 size-3.5" />{t("invoices.actions.checkPayment")}</Button>}
           {invoice.document_url && <a href={invoice.document_url} target="_blank" rel="noreferrer" aria-label={t("invoices.actions.openDocument")} className="inline-flex size-7 items-center justify-center rounded-lg text-dark-500 hover:bg-dark-100"><ExternalLink className="size-4" /></a>}
         </div></TableCell>
       </TableRow>)}</TableBody>

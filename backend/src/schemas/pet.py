@@ -1,8 +1,8 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from src.schemas.common import OptionalText
+from src.schemas.common import OptionalText, reject_null
 
 
 class PetCreate(BaseModel):
@@ -22,6 +22,11 @@ class PetUpdate(BaseModel):
     birth_date: date | None = None
     weight: float | None = Field(None, ge=0)
     notes: OptionalText = Field(None, max_length=1000)
+
+    @field_validator("name", "species", mode="before")
+    @classmethod
+    def _reject_null(cls, value):
+        return reject_null(value)
 
 
 class PetResponse(BaseModel):

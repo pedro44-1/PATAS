@@ -59,6 +59,7 @@ export default function ClinicalAppointment() {
   const [saving, setSaving] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [correctionReason, setCorrectionReason] = useState("");
 
   useEffect(() => {
     if (!appointmentId) return;
@@ -119,6 +120,11 @@ export default function ClinicalAppointment() {
   async function save(event?: FormEvent): Promise<boolean> {
     event?.preventDefault();
     if (!canWrite) return false;
+    const correcting = appointment?.status === "completed";
+    if (correcting && !correctionReason.trim()) {
+      setMessage(t("clinicalAppointment.correction.required"));
+      return false;
+    }
     setSaving(true);
     setMessage(null);
     try {
@@ -127,12 +133,14 @@ export default function ClinicalAppointment() {
         referring_vet_id: form.referring_vet_id ? Number(form.referring_vet_id) : null,
         exam_findings: Object.entries(findingState).map(([findingId, state]) => ({ finding_id: Number(findingId), status: state.status, note: state.note || undefined })),
         medications: medications.filter((medication) => medication.name.trim()).map(({ status: _status, ...medication }) => ({ ...medication, end_date: medication.end_date || undefined, instructions: medication.instructions || undefined, notes: medication.notes || undefined })),
+        correction_reason: correcting ? correctionReason.trim() : undefined,
       });
+      setCorrectionReason("");
       setMedications(response.data.medications.map((medication) => ({ ...medication, end_date: medication.end_date ?? "", instructions: medication.instructions ?? "", notes: medication.notes ?? "" })));
       setMessage(t("clinicalAppointment.saved"));
       return true;
-    } catch {
-      setMessage(t("clinicalAppointment.errors.save"));
+    } catch (requestError: unknown) {
+      setMessage(apiErrorMessage(requestError, t, "clinicalAppointment.errors.save"));
       return false;
     } finally {
       setSaving(false);
@@ -181,6 +189,8 @@ export default function ClinicalAppointment() {
       </div>
 
       <Card className="overflow-hidden"><CardContent className="p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground"><Stethoscope className="size-5" /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="break-words text-xl font-extrabold text-foreground">{pet.name}</h2><Badge variant="outline">{pet.species}</Badge>{pet.breed && <Badge variant="outline">{pet.breed}</Badge>}{pet.archived_at && <Badge variant="destructive">{t("common.archived")}</Badge>}</div><p className="mt-1 text-sm text-muted-foreground">{owner?.name ?? "—"} · {parseApiDate(appointment.scheduled_at).toLocaleString("pt-AO", { dateStyle: "short", timeStyle: "short", timeZone: "Africa/Luanda" })}</p></div></div><div className="text-right"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("clinicalAppointment.responsible")}</p><p className="mt-1 text-sm font-bold text-foreground">{vets.find((vet) => vet.id === appointment.vet_id)?.name ?? "—"}</p><Badge className="mt-2" variant="secondary">{t(`status.${appointment.status}`)}</Badge></div></div></CardContent></Card>
+
+      {canWrite && appointment.status === "completed" && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10"><Label htmlFor="correction-reason" className="text-sm font-semibold text-amber-900 dark:text-amber-200">{t("clinicalAppointment.correction.label")}</Label><p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300">{t("clinicalAppointment.correction.hint")}</p><Input id="correction-reason" value={correctionReason} maxLength={500} onChange={(event) => setCorrectionReason(event.target.value)} className="mt-2 bg-background" /></div>}
 
       <form onSubmit={save} className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(22rem,0.9fr)]">
         <div className="space-y-6">

@@ -15,6 +15,7 @@ from src.schemas.encounter import (
     ClinicalTreatmentResponse,
 )
 from src.schemas.exam_catalog import ExamObservationResponse
+from src.services.appointment_lifecycle import clinical_correction_reason
 from src.services.audit import audit
 
 router = APIRouter()
@@ -141,6 +142,12 @@ def save_clinical_record(
     request: Request = None,
 ):
     appointment = _appointment_or_404(db, current_user.clinic_id, appointment_id)
+    correction_reason = clinical_correction_reason(
+        appointment,
+        current_user.role,
+        data.correction_reason,
+        has_existing_record=appointment.treatment is not None or bool(appointment.exam_observations),
+    )
     _vet_or_422(db, current_user.clinic_id, data.referring_vet_id)
 
     treatment = appointment.treatment
@@ -165,7 +172,10 @@ def save_clinical_record(
             ClinicalExamObservation.finding_id == finding.id,
         ).first()
         if observation_input.status == ExamFindingStatus.NOT_EVALUATED:
-            if observation:
+            if observation and correction_reason:
+                observation.status = ExamFindingStatus.NOT_EVALUATED.value
+                observation.note = observation_input.note
+            elif observation:
                 db.delete(observation)
             continue
         if observation is None:
@@ -215,7 +225,11 @@ def save_clinical_record(
         action="UPDATE",
         resource="clinical_record",
         resource_id=appointment.id,
-        details={"exam_findings": len(data.exam_findings), "medications": len(data.medications)},
+        details={
+            "exam_findings": len(data.exam_findings),
+            "medications": len(data.medications),
+            **({"correction_reason": correction_reason} if correction_reason else {}),
+        },
         ip_address=request.client.host if request else None,
     )
     return _record_response(db, appointment)
