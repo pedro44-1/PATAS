@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
-from src.core.deps import CurrentUser, get_current_user, require_permission
+from src.core.deps import CurrentUser, require_permission
+from src.core.pagination import Limit, Skip
 from src.models.appointment import Appointment
 from src.models.treatment import Treatment
 from src.models.user import User, UserRole
@@ -28,10 +29,10 @@ def _validate_referring_vet(db: Session, clinic_id: int, vet_id: int | None) -> 
 @router.get("/", response_model=list[TreatmentResponse])
 def list_treatments(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     appointment_id: int | None = None,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_permission("treatment:read")),
     db: Session = Depends(get_db),
 ):
     query = db.query(Treatment).filter(Treatment.clinic_id == current_user.clinic_id)

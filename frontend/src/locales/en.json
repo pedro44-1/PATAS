@@ -473,7 +473,18 @@
       "sendHint": "Send to the payment system",
       "markPaid": "Paid",
       "markPaidHint": "Mark as paid",
-      "openDocument": "Open issued document"
+      "openDocument": "Open issued document",
+      "retry": "Retry emission",
+      "cancel": "Cancel draft"
+    },
+    "search": "Search by number, customer or owner",
+    "sync": {
+      "failed": "Emission failed"
+    },
+    "emit": {
+      "title": "Issue fiscal document?",
+      "retryTitle": "Retry the pending emission?",
+      "description": "Issuing in Vendas cannot be undone. Check the customer and total before continuing."
     }
   },
   "clinical": {
@@ -707,5 +718,10 @@
     "administered": "Administered",
     "active": "Active",
     "voided": "Voided"
+  },
+  "pagination": {
+    "range": "{{from}}–{{to}} of {{total}}",
+    "previous": "Previous page",
+    "next": "Next page"
   }
 }

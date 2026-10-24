@@ -1,4 +1,5 @@
 import api from "./client";
+import type { PageParams } from "./pagination";
 import type { Medication, Vaccination } from "./clinical";
 
 export interface Pet {
@@ -14,6 +15,7 @@ export interface Pet {
   archived_at: string | null;
   archived_by_user_id: number | null;
   created_at: string;
+  owner_name?: string | null;
 }
 
 export interface PetCreate {
@@ -65,7 +67,8 @@ export interface PetHistoryAppointment {
 }
 
 export const petsApi = {
-  list: (includeArchived = false) => api.get<Pet[]>("/pets/", { params: { include_archived: includeArchived } }),
+  list: ({ includeArchived = false, ownerId, ...params }: PageParams & { includeArchived?: boolean; ownerId?: number } = {}) =>
+    api.get<Pet[]>("/pets/", { params: { ...params, owner_id: ownerId, include_archived: includeArchived } }),
   create: (data: PetCreate) => api.post<Pet>("/pets/", data),
   get: (id: number) => api.get<Pet>(`/pets/${id}`),
   history: (id: number) => api.get<{

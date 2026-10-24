@@ -1,4 +1,4 @@
-﻿import enum
+import enum
 from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text
@@ -45,3 +45,21 @@ class Appointment(Base):
     exam_observations = relationship("ClinicalExamObservation", back_populates="appointment", cascade="all, delete-orphan")
     treatment = relationship("Treatment", back_populates="appointment", uselist=False)
     invoice = relationship("Invoice", back_populates="appointment", uselist=False)
+
+    @property
+    def pet_name(self) -> str | None:
+        return self.pet.name if self.pet else None
+
+    @property
+    def owner_name(self) -> str | None:
+        return self.owner.name if self.owner else None
+
+    @property
+    def vet_name(self) -> str | None:
+        return self.vet.name if self.vet else None
+
+    @property
+    def subject_archived(self) -> bool:
+        return bool(
+            (self.pet and self.pet.archived_at) or (self.owner and self.owner.archived_at)
+        )

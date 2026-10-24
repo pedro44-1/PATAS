@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, get_current_user
+from src.core.pagination import Limit, Skip
 from src.core.safe_update import safe_update
 from src.models.owner import Owner
 from src.schemas.owner import OwnerCreate, OwnerResponse, OwnerUpdate
@@ -18,8 +19,8 @@ OWNER_FIELDS = {"name", "phone", "email", "address", "nif", "notes"}
 @router.get("/", response_model=list[OwnerResponse])
 def list_owners(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     q: str | None = None,
     include_archived: bool = False,
     current_user: CurrentUser = Depends(get_current_user),
@@ -31,7 +32,10 @@ def list_owners(
     if q:
         like = f"%{q}%"
         query = query.filter(
-            (Owner.name.ilike(like)) | (Owner.phone.ilike(like)) | (Owner.email.ilike(like))
+            (Owner.name.ilike(like))
+            | (Owner.phone.ilike(like))
+            | (Owner.email.ilike(like))
+            | (Owner.nif.ilike(like))
         )
     total = query.count()
     owners = query.order_by(Owner.created_at.desc()).offset(skip).limit(limit).all()

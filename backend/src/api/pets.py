@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, get_current_user, require_permission
+from src.core.pagination import Limit, Skip
 from src.models.appointment import Appointment
 from src.models.clinical_exam import ClinicalExamFinding, ClinicalExamObservation
 from src.models.medication import Medication
@@ -134,22 +135,27 @@ def get_pet_history(
 @router.get("/", response_model=list[PetResponse])
 def list_pets(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     q: str | None = None,
     owner_id: int | None = None,
     include_archived: bool = False,
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Pet).filter(Pet.clinic_id == current_user.clinic_id)
+    query = db.query(Pet).options(joinedload(Pet.owner)).filter(Pet.clinic_id == current_user.clinic_id)
     if not include_archived:
         query = query.filter(Pet.archived_at.is_(None))
     if owner_id:
         query = query.filter(Pet.owner_id == owner_id)
     if q:
-        like = f"%{q}%"
-        query = query.filter(Pet.name.ilike(like))
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            Pet.name.ilike(like)
+            | Pet.species.ilike(like)
+            | Pet.breed.ilike(like)
+            | Pet.owner.has(Owner.name.ilike(like))
+        )
     total = query.count()
     pets = query.order_by(Pet.created_at.desc()).offset(skip).limit(limit).all()
     response.headers["X-Total-Count"] = str(total)

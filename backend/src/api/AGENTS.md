@@ -13,12 +13,13 @@ Routers translate HTTP requests into validated domain operations and responses. 
 - Protect authenticated routes with the shared dependencies and explicit permission checks.
 - Scope every lookup by the current clinic; cross-clinic resources must behave as absent.
 - Add audit events to mutations, including meaningful failure/security events where the existing audit contract requires them.
-- Preserve pagination headers and query filters on list endpoints.
+- List endpoints use `Skip`/`Limit` from `core/pagination.py` (`limit` 1..200) and return `X-Total-Count`; preserve their query filters.
 - Appointment listing accepts either the legacy single `date` or the inclusive `date_from`/`date_to` pair in Luanda calendar time; reject incomplete, reversed, or mixed filters.
 - Validate appointment lifecycle transitions, overlap rules, cancellation reasons, and invoice cancellation reasons at the API boundary.
 - Do not cancel locally a billing document already accepted by Vendas; an external cancellation or credit-note contract must exist first.
 - Changing draft invoice content clears any provider quote; while an emission with a persisted idempotency key is pending, draft content is immutable.
-- An appointment has at most one treatment; a second create returns `409`.
+- An appointment has at most one treatment (`409` on a second create) and at most one non-cancelled invoice (`409`, backed by a partial unique index); cancelled/no-show appointments cannot be invoiced.
+- Draft invoices become `sent`/`paid` only through provider emission. Definitive provider `4xx` rejections (not 408/409/425/429) clear the quote and key so a new preview is possible; uncertain failures keep the key for an identical retry.
 - FT and FR require a valid Vendas preview. Quote expiry or mismatch clears the quote and requires a new preview; FR tenders must equal the provider `payable`.
 - Repeating sync for an already synchronized FR or FT returns the stored document without another provider call, including after FR becomes paid.
 - Successful billing previews are audited with resource/quote identifiers and state only; never copy the quote snapshot or personal data into audit logs.

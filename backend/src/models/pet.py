@@ -27,3 +27,7 @@ class Pet(Base):
     appointments = relationship("Appointment", back_populates="pet")
     vaccinations = relationship("Vaccination", back_populates="pet")
     medications = relationship("Medication", back_populates="pet")
+
+    @property
+    def owner_name(self) -> str | None:
+        return self.owner.name if self.owner else None

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, require_permission
+from src.core.pagination import Limit, Skip
 from src.core.security import hash_password
 from src.models.user import User
 from src.schemas.user import UserCreate, UserResponse, UserRoleUpdate
@@ -48,8 +49,8 @@ def create_user(
 @router.get("/", response_model=list[UserResponse])
 def list_users(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     current_user: CurrentUser = Depends(require_permission("user:read")),
     db: Session = Depends(get_db),
 ):

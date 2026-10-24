@@ -5,6 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { petsApi, Pet, PetCreate } from "@/api/pets";
 import { ownersApi, Owner } from "@/api/owners";
+import { OPTIONS_LIMIT, PAGE_SIZE, totalCount } from "@/api/pagination";
+import { ListPagination } from "@/components/ListPagination";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +63,9 @@ export default function Pets() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Pet | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
@@ -76,23 +82,23 @@ export default function Pets() {
 
   function load() {
     setError("");
-    Promise.all([petsApi.list(), ownersApi.list()])
-      .then(([petsRes, ownersRes]) => {
+    petsApi.list({ q: debouncedSearch || undefined, skip: page * PAGE_SIZE, limit: PAGE_SIZE })
+      .then((petsRes) => {
         setPets(petsRes.data);
-        setOwners(ownersRes.data);
+        setTotal(totalCount(petsRes));
       })
-      .catch(() => setError(t("pets.error")))
+      .catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "pets.error")))
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, []);
+  function loadOwnerOptions() {
+    ownersApi.list({ limit: OPTIONS_LIMIT })
+      .then((response) => setOwners(response.data))
+      .catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "pets.error")));
+  }
 
-  const filtered = pets.filter((p) =>
-    search === "" ||
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.species.toLowerCase().includes(search.toLowerCase()) ||
-    (p.breed ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => { load(); }, [debouncedSearch, page]);
+  useEffect(() => { loadOwnerOptions(); }, []);
 
   const currentSpecies = SPECIES_OPTIONS.find((s) => s.value === form.species);
   const breedOptions = currentSpecies?.breeds ?? [];
@@ -160,8 +166,8 @@ export default function Pets() {
     }
   }
 
-  function getOwnerName(id: number) {
-    return owners.find((o) => o.id === id)?.name ?? "—";
+  function getOwnerName(pet: Pet) {
+    return pet.owner_name ?? owners.find((o) => o.id === pet.owner_id)?.name ?? "—";
   }
 
   return (
@@ -171,7 +177,7 @@ export default function Pets() {
         <div>
           <h2 className="text-2xl font-extrabold text-dark-900">{t("pets.title")}</h2>
           <p className="text-dark-400 text-sm mt-0.5">
-            {t("pets.count", { count: pets.length })}
+            {t("pets.count", { count: total })}
           </p>
         </div>
         <Button
@@ -189,7 +195,10 @@ export default function Pets() {
         <Input
           placeholder={t("pets.search")}
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
           className="pl-10 h-11 rounded-xl bg-white border-dark-200"
         />
       </div>
@@ -203,7 +212,7 @@ export default function Pets() {
             <div className="flex justify-center py-16">
               <div className="w-6 h-6 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin" />
             </div>
-          ) : filtered.length === 0 ? (
+          ) : pets.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-dark-400">
               <PawPrint className="w-10 h-10 mb-3 opacity-30" />
               <p className="text-sm font-medium">{t("pets.noResults")}</p>
@@ -220,7 +229,7 @@ export default function Pets() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((p) => (
+                {pets.map((p) => (
                   <TableRow
                     key={p.id}
                     className="cursor-pointer"
@@ -233,7 +242,7 @@ export default function Pets() {
                         </div>
                         <div>
                           <div className="font-semibold text-dark-900 text-sm">{p.name}</div>
-                          <div className="text-dark-400 text-xs">{getOwnerName(p.owner_id)}</div>
+                          <div className="text-dark-400 text-xs">{getOwnerName(p)}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -278,6 +287,7 @@ export default function Pets() {
               </TableBody>
             </Table>
           )}
+          <ListPagination page={page} total={total} onPageChange={setPage} />
         </CardContent>
       </Card>
 

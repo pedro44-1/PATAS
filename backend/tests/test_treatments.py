@@ -108,3 +108,8 @@ def test_second_treatment_for_same_appointment_conflicts(client, vet_headers, tr
         "diagnosis": "Duplicado",
     })
     assert response.status_code == 409
+
+
+def test_receptionist_cannot_list_treatments(client, receptionist_headers, treatment):
+    response = client.get("/api/v1/treatments/", headers=receptionist_headers)
+    assert response.status_code == 403

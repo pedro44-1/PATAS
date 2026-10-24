@@ -429,7 +429,18 @@
       "sendHint": "Enviar para o sistema de pagamentos",
       "markPaid": "Paga",
       "markPaidHint": "Marcar como paga",
-      "openDocument": "Abrir documento emitido"
+      "openDocument": "Abrir documento emitido",
+      "retry": "Repetir emissão",
+      "cancel": "Cancelar rascunho"
+    },
+    "search": "Pesquisar por número, cliente ou dono",
+    "sync": {
+      "failed": "Falha na emissão"
+    },
+    "emit": {
+      "title": "Emitir documento fiscal?",
+      "retryTitle": "Repetir a emissão pendente?",
+      "description": "A emissão no Vendas é irreversível. Confirme o cliente e o total antes de continuar."
     }
   },
   "clinical": {
@@ -707,5 +718,10 @@
     "administered": "Administrada",
     "active": "Ativo",
     "voided": "Anulado"
+  },
+  "pagination": {
+    "range": "{{from}}–{{to}} de {{total}}",
+    "previous": "Página anterior",
+    "next": "Página seguinte"
   }
 }

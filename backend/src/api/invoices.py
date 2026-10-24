@@ -5,11 +5,12 @@ from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, get_current_user, require_permission
-from src.models.appointment import Appointment
+from src.core.pagination import Limit, Skip
+from src.models.appointment import Appointment, AppointmentStatus
 from src.models.clinic import Clinic
 from src.models.invoice import (
     Invoice,
@@ -30,12 +31,13 @@ from src.services.billing import (
 router = APIRouter()
 
 INVOICE_TRANSITIONS = {
-    InvoiceStatus.DRAFT: {InvoiceStatus.SENT, InvoiceStatus.CANCELLED},
+    InvoiceStatus.DRAFT: {InvoiceStatus.CANCELLED},
     InvoiceStatus.SENT: {InvoiceStatus.CANCELLED},
     InvoiceStatus.PAID: set(),
     InvoiceStatus.CANCELLED: set(),
 }
 CENT = Decimal("0.01")
+RETRYABLE_PROVIDER_STATUSES = {408, 409, 425, 429}
 
 
 def _money(value: Decimal) -> Decimal:
@@ -119,6 +121,10 @@ def _provider_error_code(exc: httpx.HTTPStatusError) -> str | None:
     return data.get("code")
 
 
+def _is_definitive_rejection(status_code: int) -> bool:
+    return 400 <= status_code < 500 and status_code not in RETRYABLE_PROVIDER_STATUSES
+
+
 def _clear_quote(invoice: Invoice) -> None:
     invoice.quote_id = None
     invoice.quote_expires_at = None
@@ -132,18 +138,34 @@ def _clear_quote(invoice: Invoice) -> None:
 @router.get("/", response_model=list[InvoiceResponse])
 def list_invoices(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     owner_id: int | None = None,
+    appointment_id: int | None = None,
+    pet_id: int | None = None,
     status: str | None = None,
+    q: str | None = None,
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Invoice).filter(Invoice.clinic_id == current_user.clinic_id)
+    query = db.query(Invoice).options(selectinload(Invoice.lines)).filter(
+        Invoice.clinic_id == current_user.clinic_id
+    )
     if owner_id:
         query = query.filter(Invoice.owner_id == owner_id)
+    if appointment_id:
+        query = query.filter(Invoice.appointment_id == appointment_id)
+    if pet_id:
+        query = query.filter(Invoice.appointment.has(Appointment.pet_id == pet_id))
     if status:
         query = query.filter(Invoice.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            Invoice.document_number.ilike(like)
+            | Invoice.customer_name.ilike(like)
+            | Invoice.owner.has(Owner.name.ilike(like))
+        )
     total = query.count()
     invoices = query.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
     response.headers["X-Total-Count"] = str(total)
@@ -176,6 +198,15 @@ def create_invoice(
             raise HTTPException(status_code=404, detail="Consulta não encontrada")
         if appointment.owner_id != data.owner_id:
             raise HTTPException(status_code=422, detail="A consulta não pertence ao dono indicado")
+        if appointment.status in {AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW}:
+            raise HTTPException(status_code=409, detail="Consultas canceladas ou faltas não podem ser faturadas")
+        existing = db.query(Invoice.id).filter(
+            Invoice.clinic_id == current_user.clinic_id,
+            Invoice.appointment_id == appointment.id,
+            Invoice.status != InvoiceStatus.CANCELLED,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Esta consulta já tem uma fatura ativa")
 
     clinic = db.query(Clinic).filter(Clinic.id == current_user.clinic_id).first()
     invoice = Invoice(
@@ -416,7 +447,11 @@ def sync_invoice(
         invoice.sync_status = InvoiceSyncStatus.FAILED
         invoice.sync_attempts += 1
         invoice.last_sync_at = datetime.now(UTC)
-        invoice.last_sync_error = "O software de faturação não aceitou o pedido"
+        if _is_definitive_rejection(exc.response.status_code):
+            _clear_quote(invoice)
+            invoice.last_sync_error = "O software de faturação rejeitou o documento; calcule uma nova prévia"
+        else:
+            invoice.last_sync_error = "O software de faturação não aceitou o pedido"
         db.commit()
         raise HTTPException(status_code=502, detail=invoice.last_sync_error) from exc
     except httpx.HTTPError as exc:

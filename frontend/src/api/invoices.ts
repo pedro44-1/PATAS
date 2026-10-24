@@ -7,12 +7,13 @@ import type {
 } from "@patas/shared-types";
 
 import api from "./client";
+import type { PageParams } from "./pagination";
 
 export type Invoice = InvoiceResponse;
 export type { InvoiceCreate, InvoiceStatus, InvoiceUpdate, PaymentMethod };
 
 export const invoicesApi = {
-  list: (params?: { owner_id?: number; status?: string }) =>
+  list: (params: PageParams & { owner_id?: number; pet_id?: number; appointment_id?: number; status?: string } = {}) =>
     api.get<Invoice[]>("/invoices/", { params }),
   create: (data: InvoiceCreate) => api.post<Invoice>("/invoices/", data),
   update: (id: number, data: InvoiceUpdate) => api.patch<Invoice>(`/invoices/${id}`, data),

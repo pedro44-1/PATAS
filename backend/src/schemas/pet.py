@@ -37,6 +37,7 @@ class PetResponse(BaseModel):
     archived_at: datetime | None
     archived_by_user_id: int | None
     created_at: datetime
+    owner_name: str | None = None
 
     class Config:
         from_attributes = True

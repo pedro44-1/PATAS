@@ -265,3 +265,37 @@ def test_appointments_scoped_by_clinic(client, vet_headers, appointment, db_sess
     ids = [a["id"] for a in response.json()]
     assert appointment.id in ids
     assert other_appt.id not in ids
+
+
+def test_list_appointments_filters_orders_and_counts(client, vet_headers, pet, vet_user):
+    for hour in ("09:00", "11:00", "10:00"):
+        created = client.post("/api/v1/appointments/", headers=vet_headers, json={
+            "pet_id": pet.id,
+            "vet_id": vet_user.id,
+            "scheduled_at": f"2031-04-02T{hour}:00",
+            "reason": f"Revisão {hour}",
+        })
+        assert created.status_code == 200
+
+    response = client.get(
+        "/api/v1/appointments/",
+        headers=vet_headers,
+        params={"pet_id": pet.id, "order": "desc", "limit": 2, "q": "Revisão"},
+    )
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "3"
+    reasons = [item["reason"] for item in response.json()]
+    assert reasons == ["Revisão 11:00", "Revisão 10:00"]
+
+
+def test_list_limit_is_bounded(client, vet_headers):
+    assert client.get("/api/v1/appointments/", headers=vet_headers, params={"limit": 500}).status_code == 422
+    assert client.get("/api/v1/owners/", headers=vet_headers, params={"skip": -1}).status_code == 422
+
+
+def test_appointment_response_includes_related_names(client, vet_headers, appointment, pet, owner, vet_user):
+    data = client.get(f"/api/v1/appointments/{appointment.id}", headers=vet_headers).json()
+    assert data["pet_name"] == pet.name
+    assert data["owner_name"] == owner.name
+    assert data["vet_name"] == vet_user.name
+    assert data["subject_archived"] is False

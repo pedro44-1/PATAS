@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,10 @@ class AppointmentResponse(BaseModel):
     weight: float | None
     service_type_id: int | None
     created_at: datetime
+    pet_name: str | None = None
+    owner_name: str | None = None
+    vet_name: str | None = None
+    subject_archived: bool = False
 
     class Config:
         from_attributes = True

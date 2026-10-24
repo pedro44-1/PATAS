@@ -1,4 +1,5 @@
 import api from "./client";
+import type { PageParams } from "./pagination";
 
 export type AppointmentStatus = "scheduled" | "in-progress" | "completed" | "cancelled" | "no-show";
 
@@ -23,6 +24,10 @@ export interface Appointment {
   weight: number | null;
   service_type_id: number | null;
   created_at: string;
+  pet_name?: string | null;
+  owner_name?: string | null;
+  vet_name?: string | null;
+  subject_archived?: boolean;
 }
 
 export interface AppointmentCreate {
@@ -37,9 +42,13 @@ export interface AppointmentCreate {
   status_reason?: string;
 }
 
-export interface AppointmentListFilters {
+export interface AppointmentListFilters extends PageParams {
   dateFrom?: string;
   dateTo?: string;
+  petId?: number;
+  ownerId?: number;
+  status?: AppointmentStatus;
+  order?: "asc" | "desc";
 }
 
 export const appointmentsApi = {
@@ -47,7 +56,17 @@ export const appointmentsApi = {
     const params = typeof filter === "string"
       ? { date: filter }
       : filter
-        ? { date_from: filter.dateFrom, date_to: filter.dateTo }
+        ? {
+          date_from: filter.dateFrom,
+          date_to: filter.dateTo,
+          pet_id: filter.petId,
+          owner_id: filter.ownerId,
+          status: filter.status,
+          order: filter.order,
+          q: filter.q,
+          skip: filter.skip,
+          limit: filter.limit,
+        }
         : {};
     return api.get<Appointment[]>("/appointments/", { params });
   },

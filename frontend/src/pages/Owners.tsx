@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ownersApi, Owner, OwnerCreate } from "@/api/owners";
 import { apiErrorMessage } from "@/api/errors";
+import { PAGE_SIZE, totalCount } from "@/api/pagination";
+import { ListPagination } from "@/components/ListPagination";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,26 +36,25 @@ export default function Owners() {
     notes: "",
   });
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
 
   function load() {
     setLoading(true);
-    ownersApi.list()
-      .then((r) => setOwners(r.data))
+    ownersApi.list({ q: debouncedSearch || undefined, skip: page * PAGE_SIZE, limit: PAGE_SIZE })
+      .then((r) => {
+        setOwners(r.data);
+        setTotal(totalCount(r));
+      })
       .catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "owners.error")))
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, []);
-
-  const filtered = owners.filter((o) =>
-    search === "" ||
-    o.name.toLowerCase().includes(search.toLowerCase()) ||
-    (o.email ?? "").toLowerCase().includes(search.toLowerCase()) ||
-    (o.phone ?? "").includes(search)
-  );
+  useEffect(() => { load(); }, [debouncedSearch, page]);
 
   function openCreate() {
     setEditing(null);
@@ -110,7 +112,7 @@ export default function Owners() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-dark-900">{t("owners.title")}</h2>
-          <p className="text-dark-400 text-sm mt-0.5">{t("owners.count", { count: owners.length })}</p>
+          <p className="text-dark-400 text-sm mt-0.5">{t("owners.count", { count: total })}</p>
         </div>
         <Button
           onClick={openCreate}
@@ -127,7 +129,10 @@ export default function Owners() {
         <Input
           placeholder={t("owners.search")}
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
           className="pl-10 h-11 rounded-xl bg-white border-dark-200"
         />
       </div>
@@ -140,12 +145,15 @@ export default function Owners() {
             <div className="flex justify-center py-16">
               <div className="w-6 h-6 border-2 border-brand-600/30 border-t-brand-600 rounded-full animate-spin" />
             </div>
-          ) : filtered.length === 0 ? (
+          ) : owners.length === 0 ? (
             <div className="flex flex-col items-center py-16 text-dark-400">
               <p className="text-sm font-medium">{t("owners.noResults")}</p>
               {search && (
                 <button
-                  onClick={() => setSearch("")}
+                  onClick={() => {
+                    setSearch("");
+                    setPage(0);
+                  }}
                   className="mt-2 text-xs text-brand-600 hover:text-brand-700 font-semibold"
                 >
                   {t("owners.clearSearch")}
@@ -164,7 +172,7 @@ export default function Owners() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((o) => (
+                {owners.map((o) => (
                   <TableRow key={o.id}>
                     <TableCell className="pl-5 font-semibold text-dark-900 text-sm">
                       {o.name}
@@ -221,6 +229,7 @@ export default function Owners() {
               </TableBody>
             </Table>
           )}
+          <ListPagination page={page} total={total} onPageChange={setPage} />
         </CardContent>
       </Card>
 

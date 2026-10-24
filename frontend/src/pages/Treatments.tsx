@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { apiErrorMessage } from "@/api/errors";
+import { OPTIONS_LIMIT } from "@/api/pagination";
 import { FormError } from "@/components/ui/form-error";
 import { useTranslation } from "react-i18next";
 import { treatmentsApi, Treatment, TreatmentCreate } from "@/api/treatments";
@@ -96,7 +97,7 @@ export default function Treatments() {
   const [appointmentFormError, setAppointmentFormError] = useState("");
 
   function load() {
-    Promise.all([treatmentsApi.list(), appointmentsApi.list()])
+    Promise.all([treatmentsApi.list(), appointmentsApi.list({ order: "desc", limit: OPTIONS_LIMIT })])
       .then(([tRes, aRes]) => {
         setTreatments(tRes.data);
         setAppointments(aRes.data);
@@ -167,7 +168,7 @@ export default function Treatments() {
   function openAppointmentCreate() {
     setShowAppointmentForm(true);
     setAppointmentOptionsLoading(true);
-    Promise.all([petsApi.list(), appointmentsApi.vets()])
+    Promise.all([petsApi.list({ limit: OPTIONS_LIMIT }), appointmentsApi.vets()])
       .then(([petsResponse, vetsResponse]) => {
         setPets(petsResponse.data);
         setVets(vetsResponse.data);

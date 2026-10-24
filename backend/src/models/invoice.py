@@ -7,11 +7,13 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -114,6 +116,13 @@ class Invoice(Base):
 
     __table_args__ = (
         UniqueConstraint("clinic_id", "document_number", name="uq_invoices_clinic_document_number"),
+        Index(
+            "uq_invoices_active_appointment",
+            "appointment_id",
+            unique=True,
+            postgresql_where=text("appointment_id IS NOT NULL AND status <> 'cancelled'"),
+            sqlite_where=text("appointment_id IS NOT NULL AND status <> 'cancelled'"),
+        ),
     )
 
 

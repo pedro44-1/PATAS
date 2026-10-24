@@ -62,20 +62,21 @@ export default function ClinicalAppointment() {
 
   useEffect(() => {
     if (!appointmentId) return;
-    Promise.all([
-      appointmentsApi.get(appointmentId),
-      petsApi.list(true),
-      ownersApi.list(true),
-      appointmentsApi.vets(),
-      examCatalogApi.get(),
-      encountersApi.get(appointmentId),
-    ])
-      .then(([appointmentResponse, petsResponse, ownersResponse, vetsResponse, catalogResponse, recordResponse]) => {
+    appointmentsApi.get(appointmentId)
+      .then((appointmentResponse) => Promise.all([
+        appointmentResponse,
+        petsApi.get(appointmentResponse.data.pet_id),
+        ownersApi.get(appointmentResponse.data.owner_id),
+        appointmentsApi.vets(),
+        examCatalogApi.get(),
+        encountersApi.get(appointmentId),
+      ]))
+      .then(([appointmentResponse, petResponse, ownerResponse, vetsResponse, catalogResponse, recordResponse]) => {
         const nextAppointment = appointmentResponse.data;
         const record = recordResponse.data;
         setAppointment(nextAppointment);
-        setPet(petsResponse.data.find((item) => item.id === nextAppointment.pet_id) ?? null);
-        setOwner(ownersResponse.data.find((item) => item.id === nextAppointment.owner_id) ?? null);
+        setPet(petResponse.data);
+        setOwner(ownerResponse.data);
         setVets(vetsResponse.data);
         setCatalog(catalogResponse.data);
         const nextFindingState: Record<number, FindingState> = {};

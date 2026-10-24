@@ -15,6 +15,7 @@ Shared components own reusable presentation and interaction primitives. Pages an
 - Visible labels, empty states, errors, and actions must use the locale system.
 - Do not embed resource-specific API calls in generic UI primitives.
 - Theme controls persist the selected `light` or `dark` value in `patas_theme` and apply it through the root `dark` class.
+- `ListPagination` wraps the `ui/pagination` primitive with locale keys for paged lists.
 - Brand components own only shared visual identity; use locale keys for their visible copy.
 - Mobile presentation is selected with CSS breakpoints, never by duplicating routes or detecting a device in application logic.
 - The authenticated shell exposes the frequent clinical routes through the mobile bottom navigation; secondary routes remain in the drawer.

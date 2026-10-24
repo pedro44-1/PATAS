@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, require_permission
+from src.core.pagination import Limit, Skip
 from src.models.appointment import Appointment
 from src.models.medication import Medication, MedicationStatus
 from src.models.pet import Pet
@@ -116,8 +117,8 @@ def _medication_payload(record: Medication) -> dict:
 @router.get("/vaccinations/", response_model=list[VaccinationResponse])
 def list_vaccinations(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     pet_id: int | None = None,
     current_user: CurrentUser = Depends(require_permission("clinical:read")),
     db: Session = Depends(get_db),
@@ -248,8 +249,8 @@ def void_vaccination(
 @router.get("/medications/", response_model=list[MedicationResponse])
 def list_medications(
     response: Response,
-    skip: int = 0,
-    limit: int = 100,
+    skip: Skip = 0,
+    limit: Limit = 100,
     pet_id: int | None = None,
     current_user: CurrentUser = Depends(require_permission("clinical:read")),
     db: Session = Depends(get_db),

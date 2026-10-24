@@ -1,12 +1,16 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from src.core.database import get_db
 from src.core.deps import CurrentUser, get_current_user
+from src.core.pagination import Limit, Skip
 from src.core.timezones import local_day_bounds, utc_naive
 from src.models.appointment import Appointment, AppointmentStatus
+from src.models.owner import Owner
 from src.models.pet import Pet
 from src.models.service_type import ServiceType
 from src.models.user import User, UserRole
@@ -57,11 +61,17 @@ def _validate_service_type(db: Session, clinic_id: int, service_type_id: int | N
 
 @router.get("/", response_model=list[AppointmentResponse])
 def list_appointments(
+    response: Response,
     date: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    q: str | None = None,
+    pet_id: int | None = None,
+    owner_id: int | None = None,
+    status: AppointmentStatus | None = None,
+    order: Literal["asc", "desc"] = "asc",
+    skip: Skip = 0,
+    limit: Limit = 100,
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -89,7 +99,22 @@ def list_appointments(
             Appointment.scheduled_at >= start,
             Appointment.scheduled_at < end,
         )
-    return query.order_by(Appointment.scheduled_at).offset(skip).limit(limit).all()
+    if pet_id:
+        query = query.filter(Appointment.pet_id == pet_id)
+    if owner_id:
+        query = query.filter(Appointment.owner_id == owner_id)
+    if status:
+        query = query.filter(Appointment.status == status)
+    if q:
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            Appointment.pet.has(Pet.name.ilike(like))
+            | Appointment.owner.has(Owner.name.ilike(like))
+            | Appointment.reason.ilike(like)
+        )
+    response.headers["X-Total-Count"] = str(query.count())
+    ordering = Appointment.scheduled_at.desc() if order == "desc" else Appointment.scheduled_at
+    return query.order_by(ordering).offset(skip).limit(limit).all()
 
 
 @router.post("/", response_model=AppointmentResponse)

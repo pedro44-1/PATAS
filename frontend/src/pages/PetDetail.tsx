@@ -7,6 +7,7 @@ import { Appointment } from "@/api/appointments";
 import { Treatment } from "@/api/treatments";
 import { Medication, Vaccination } from "@/api/clinical";
 import { invoicesApi, Invoice } from "@/api/invoices";
+import { OPTIONS_LIMIT } from "@/api/pagination";
 import { useAuth } from "@/contexts/AuthContext";
 import ClinicalHistory from "@/features/pets/ClinicalHistory";
 import { Card, CardContent } from "@/components/ui/card";
@@ -194,16 +195,16 @@ export default function PetDetail() {
 
   useEffect(() => {
     if (!petId) return;
-    Promise.all([
-      petsApi.get(petId),
-      ownersApi.list(true),
-      petsApi.history(petId),
-      invoicesApi.list(),
-    ])
-      .then(([petRes, ownersRes, historyRes, invRes]) => {
+    petsApi.get(petId)
+      .then((petRes) => Promise.all([
+        petRes,
+        ownersApi.get(petRes.data.owner_id),
+        petsApi.history(petId),
+        invoicesApi.list({ owner_id: petRes.data.owner_id, limit: OPTIONS_LIMIT }),
+      ]))
+      .then(([petRes, ownerRes, historyRes, invRes]) => {
         setPet(petRes.data);
-        const o = ownersRes.data.find((x: Owner) => x.id === petRes.data.owner_id);
-        setOwner(o ?? null);
+        setOwner(ownerRes.data);
         const petAppts = historyRes.data.appointments.map((a: PetHistoryAppointment) => ({
           id: a.id,
           clinic_id: petRes.data.clinic_id,
@@ -227,7 +228,8 @@ export default function PetDetail() {
         setTreatments(petTreats);
         setVaccinations(historyRes.data.vaccinations ?? []);
         setMedications(historyRes.data.medications ?? []);
-        const petInvs = invRes.data.filter((i: Invoice) => i.owner_id === petRes.data.owner_id);
+        const petAppointmentIds = new Set(petAppts.map((appointment) => appointment.id));
+        const petInvs = invRes.data.filter((i: Invoice) => i.appointment_id === null || petAppointmentIds.has(i.appointment_id));
         setInvoices(petInvs);
       })
       .finally(() => setLoading(false));

@@ -24,6 +24,7 @@ Pages own screen composition, user-flow state, and route-level loading/error/emp
 - Appointment creation presents quick animal registration as the first animal-selector option. Its owner selector presents quick owner registration first; both nested flows preserve their parent drafts and automatically select the created record.
 - The appointments page filters the agenda with an inclusive start/end date interval and defaults both boundaries to the current Luanda clinic date.
 - Invoice preparation collects owner NIF, optional appointment, document/payment type, and repeatable product/service lines. The local subtotal is provisional; issuance requires a valid Vendas preview and shows its authoritative payable. The pending collection summary counts only issued FT and uses the Vendas payable, never draft subtotals.
+- Owners, pets and invoices page and search on the server through `ListPagination`. Invoice emission and retry go through a confirmation dialog showing the Vendas payable; a pending emission offers "Repetir emissão" instead of a new preview, and failed syncs show `last_sync_error`.
 - Show local cancellation only for invoice drafts; an issued Vendas document requires an external correction flow.
 - Interpret quote expiry values without a timezone as UTC, matching the backend's stored UTC timestamps.
 

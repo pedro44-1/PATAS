@@ -328,7 +328,7 @@ curl -X GET "http://localhost:8000/api/v1/appointments/?date_from=2026-07-21&dat
   -H "Authorization: Bearer <token>"
 ```
 
-`date` preserves the single-day filter. For an inclusive interval, send both `date_from` and `date_to`; incomplete, reversed, or mixed single-date/range filters return `422`.
+`date` preserves the single-day filter. For an inclusive interval, send both `date_from` and `date_to`; incomplete, reversed, or mixed single-date/range filters return `422`. Optional filters: `pet_id`, `owner_id`, `status`, `q` (pet, owner or reason) and `order=asc|desc` (by `scheduled_at`). Responses include `pet_name`, `owner_name`, `vet_name` and `subject_archived`, plus the `X-Total-Count` header.
 
 ### Create
 
@@ -388,6 +388,8 @@ curl -X GET "http://localhost:8000/api/v1/treatments/?appointment_id=1" \
   -H "Authorization: Bearer <token>"
 ```
 
+Requires `treatment:read` (receptionists receive `403`). An appointment has at most one treatment; a second create returns `409`.
+
 ### Create (vet/admin only)
 
 ```bash
@@ -431,12 +433,14 @@ Devolve `405`: tratamentos clínicos nunca são eliminados fisicamente.
 
 ## Invoices
 
-### List (filter by owner, status)
+### List (filter by owner, pet, appointment, status, search)
 
 ```bash
-curl -X GET "http://localhost:8000/api/v1/invoices/?owner_id=1&status=draft" \
+curl -X GET "http://localhost:8000/api/v1/invoices/?owner_id=1&status=draft&q=FT" \
   -H "Authorization: Bearer <token>"
 ```
+
+`pet_id` matches invoices whose appointment belongs to the pet; `q` searches the document number, customer name and owner name. An appointment accepts one non-cancelled invoice (`409` otherwise), and cancelled or no-show appointments cannot be invoiced.
 
 ### Create (receção, vet ou admin)
 
@@ -475,7 +479,7 @@ curl -X PATCH http://localhost:8000/api/v1/invoices/1 \
 
 Status values: `draft`, `sent`, `paid`, `cancelled`.
 
-**Note:** `cancelled` exige `reason` e só é permitido antes da emissão externa. `paid` não pode ser definido manualmente no PATAS.
+**Note:** `cancelled` exige `reason` e só é permitido antes da emissão externa. `sent` e `paid` não podem ser definidos manualmente no PATAS; só a emissão no Vendas os aplica. Alterar `amount`/`description` de um rascunho limpa a prévia fiscal; com uma emissão pendente (`sync_attempts > 0` e `idempotency_key`), o conteúdo fica bloqueado (`409`).
 
 O PATAS prepara linhas e preços líquidos. Antes da emissão, obtenha a prévia fiscal:
 
@@ -497,7 +501,7 @@ O cliente Vendas chama primeiro `POST /api/integrations/v1/invoices/preview` e d
 
 O payload externo serializa quantidades, preços, descontos e pagamentos como strings decimais exatas. Cada linha recebe código de até 64 caracteres, unidade de até 12 e `vatProfileCode` de até 80; o perfil pode ser indicado por linha ou herdado da configuração predefinida. Na ausência de código, o PATAS gera um identificador determinístico por clínica, tipo e descrição, evitando criar um artigo novo por fatura. Campos opcionais sem valor são omitidos. FR suporta `CASH`, `CARD` e `TRANSFER`; `other` é rejeitado. A referência legível devolvida pelo Vendas é apresentada como número do documento; `seriesId` permanece metadado interno.
 
-`VAT_PROFILE_REQUIRED` pede configuração comercial no Vendas. `QUOTE_NOT_FOUND`, `QUOTE_EXPIRED`, `QUOTE_MISMATCH` e `QUOTE_STALE` invalidam a cotação local e exigem nova prévia. Um timeout de emissão reutiliza exatamente o mesmo corpo e chave para evitar duplicação.
+`VAT_PROFILE_REQUIRED` pede configuração comercial no Vendas. `QUOTE_NOT_FOUND`, `QUOTE_EXPIRED`, `QUOTE_MISMATCH` e `QUOTE_STALE` invalidam a cotação local e exigem nova prévia. Um timeout, erro de transporte, `5xx`, `408`, `409`, `425` ou `429` na emissão mantém a chave e reutiliza exatamente o mesmo corpo na repetição, para evitar duplicação. Outras rejeições `4xx` são definitivas: limpam a prévia e a chave, guardam `last_sync_error` e permitem uma nova prévia.
 
 Variáveis do backend: `BILLING_PROVIDER`, `VENDAS_BASE_URL`, `VENDAS_API_KEY`, `VENDAS_OPERATION_TYPE`, `VENDAS_DEFAULT_VAT_PROFILE_CODE`, `VENDAS_CASH_SESSION_ID` e `VENDAS_REQUEST_TIMEOUT_SECONDS`. O modo atual do Vendas é `TRAINING` e não produz documentos com validade fiscal.
 
@@ -674,16 +678,16 @@ Veterinarians and administrators save history, diagnosis, free prescription, exa
 ## Pagination & Filters
 
 All list endpoints support:
-- `skip` (default 0)
-- `limit` (default 100, max 1000)
+- `skip` (default 0, `>= 0`)
+- `limit` (default 100, `1..200`; outside the range returns `422`)
 - Returns `X-Total-Count` header
 
 Additional filters:
-- **Owners**: `?q=search_term`
-- **Pets**: `?q=search_term&owner_id=1`
-- **Appointments**: `?date=2026-07-21`
+- **Owners**: `?q=` (name, phone, email, NIF)
+- **Pets**: `?q=` (name, species, breed, owner name) `&owner_id=1`
+- **Appointments**: `?date=2026-07-21` or `date_from`/`date_to`, `pet_id`, `owner_id`, `status`, `q`, `order`
 - **Treatments**: `?appointment_id=1`
-- **Invoices**: `?owner_id=1&status=draft`
+- **Invoices**: `?owner_id=1&pet_id=2&appointment_id=3&status=draft&q=`
 
 ---
 

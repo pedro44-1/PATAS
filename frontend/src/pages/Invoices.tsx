@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { FormError } from "@/components/ui/form-error";
 import { useTranslation } from "react-i18next";
-import { Calculator, ExternalLink, FileText, Plus, Send, Trash2, X } from "lucide-react";
+import { AlertTriangle, Calculator, ExternalLink, FileText, Plus, RotateCw, Search, Send, Trash2, X } from "lucide-react";
 
 import { appointmentsApi, Appointment } from "@/api/appointments";
 import { apiErrorMessage } from "@/api/errors";
+import { OPTIONS_LIMIT, PAGE_SIZE, totalCount } from "@/api/pagination";
+import { ListPagination } from "@/components/ListPagination";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { Invoice, invoicesApi, InvoiceStatus, PaymentMethod } from "@/api/invoices";
 import { Owner, ownersApi } from "@/api/owners";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +33,8 @@ const hasValidQuote = (invoice: Invoice) => Boolean(
   && quoteExpiryTime(invoice.quote_expires_at) > Date.now(),
 );
 
+const hasPendingEmission = (invoice: Invoice) => invoice.sync_attempts > 0 && Boolean(invoice.idempotency_key);
+
 export default function Invoices() {
   const { t } = useTranslation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -41,31 +47,54 @@ export default function Invoices() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [emitTarget, setEmitTarget] = useState<Invoice | null>(null);
 
   function load() {
     setLoading(true);
     setError("");
     Promise.all([
-      invoicesApi.list(filterStatus ? { status: filterStatus } : undefined),
-      ownersApi.list(),
-      appointmentsApi.list(),
-    ]).then(([invoiceResponse, ownerResponse, appointmentResponse]) => {
+      invoicesApi.list({ status: filterStatus || undefined, q: debouncedSearch || undefined, skip: page * PAGE_SIZE, limit: PAGE_SIZE }),
+      invoicesApi.list({ status: "sent", limit: OPTIONS_LIMIT }),
+    ]).then(([invoiceResponse, pendingResponse]) => {
       setInvoices(invoiceResponse.data);
-      setOwners(ownerResponse.data);
-      setAppointments(appointmentResponse.data);
+      setTotal(totalCount(invoiceResponse));
+      setPendingInvoices(pendingResponse.data);
+      setPendingCount(totalCount(pendingResponse));
     }).catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "invoices.error")))
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, [filterStatus]);
+  useEffect(() => { load(); }, [filterStatus, debouncedSearch, page]);
+
+  useEffect(() => {
+    ownersApi.list({ limit: OPTIONS_LIMIT })
+      .then((response) => setOwners(response.data))
+      .catch((requestError: unknown) => setError(apiErrorMessage(requestError, t, "invoices.error")));
+  }, []);
+
+  useEffect(() => {
+    if (!showForm || !form.owner_id) {
+      setAppointments([]);
+      return;
+    }
+    appointmentsApi.list({ ownerId: form.owner_id, order: "desc", limit: 50 })
+      .then((response) => setAppointments(response.data))
+      .catch((requestError: unknown) => setFormError(apiErrorMessage(requestError, t, "invoices.error")));
+  }, [showForm, form.owner_id]);
 
   const owner = owners.find((item) => item.id === form.owner_id);
-  const ownerAppointments = appointments.filter((item) => item.owner_id === form.owner_id);
+  const ownerAppointments = appointments.filter((item) => item.status !== "cancelled" && item.status !== "no-show");
   const subtotal = useMemo(
     () => form.items.reduce((result, item) => result + item.quantity * item.unit_price, 0),
     [form.items],
   );
-  const pendingInvoices = invoices.filter((item) => item.status === "sent");
   const pendingTotal = pendingInvoices.reduce((sum, item) => sum + Math.round(Number(item.quote_payable ?? item.amount) * 100), 0) / 100;
 
   function openCreate() {
@@ -98,38 +127,40 @@ export default function Invoices() {
     }
   }
 
-  async function handleStatus(id: number, status: InvoiceStatus) {
+  async function runRowAction(id: number, action: () => Promise<unknown>, errorKey = "invoices.error") {
+    setBusyId(id);
+    setError("");
     try {
-      const reason = status === "cancelled" ? window.prompt(t("invoices.cancelReason")) ?? "" : undefined;
-      if (status === "cancelled" && !reason?.trim()) return;
-      await invoicesApi.update(id, { status, reason });
+      await action();
       load();
     } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "invoices.error"));
+      setError(apiErrorMessage(requestError, t, errorKey));
+      load();
+    } finally {
+      setBusyId(null);
     }
   }
 
-  async function handleSync(id: number) {
-    try {
-      await invoicesApi.sync(id);
-      load();
-    } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "invoices.error"));
-    }
+  function handleStatus(id: number, status: InvoiceStatus) {
+    const reason = status === "cancelled" ? window.prompt(t("invoices.cancelReason")) ?? "" : undefined;
+    if (status === "cancelled" && !reason?.trim()) return;
+    return runRowAction(id, () => invoicesApi.update(id, { status, reason }));
   }
 
-  async function handlePreview(id: number) {
-    try {
-      await invoicesApi.preview(id);
-      load();
-    } catch (requestError: unknown) {
-      setError(apiErrorMessage(requestError, t, "invoices.previewError"));
-    }
+  async function confirmEmission() {
+    if (!emitTarget) return;
+    const target = emitTarget;
+    await runRowAction(target.id, () => invoicesApi.sync(target.id));
+    setEmitTarget(null);
+  }
+
+  function handlePreview(id: number) {
+    return runRowAction(id, () => invoicesApi.preview(id), "invoices.previewError");
   }
 
   return <div className="space-y-6 animate-fade-in">
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div><h2 className="text-2xl font-extrabold text-dark-900">{t("invoices.title")}</h2><p className="mt-0.5 text-sm text-dark-400">{t("invoices.count", { count: invoices.length })}</p></div>
+      <div><h2 className="text-2xl font-extrabold text-dark-900">{t("invoices.title")}</h2><p className="mt-0.5 text-sm text-dark-400">{t("invoices.count", { count: total })}</p></div>
       <div className="flex items-center gap-3">
         <FormSelect value={filterStatus} onValueChange={setFilterStatus} options={["", "draft", "sent", "paid", "cancelled"].map((value) => ({ value, label: t(`invoices.filter.${value || "all"}`) }))} className="min-w-36" />
         <Button onClick={openCreate}><Plus className="mr-2 size-4" />{t("invoices.new")}</Button>
@@ -137,7 +168,8 @@ export default function Invoices() {
     </div>
 
     <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{t("invoices.trainingNotice")}</div>
-    {pendingTotal > 0 && <div className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"><div><p className="text-sm font-semibold text-amber-800">{t("invoices.pendingAlert.label")}</p><p className="text-xs text-amber-600">{t("invoices.pendingAlert.hint", { amount: pendingTotal.toLocaleString("pt-AO"), count: pendingInvoices.length })}</p></div><span className="text-lg font-extrabold tabular-nums text-amber-800">{pendingTotal.toLocaleString("pt-AO")} Kz</span></div>}
+    {pendingTotal > 0 && <div className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"><div><p className="text-sm font-semibold text-amber-800">{t("invoices.pendingAlert.label")}</p><p className="text-xs text-amber-600">{t("invoices.pendingAlert.hint", { amount: pendingTotal.toLocaleString("pt-AO"), count: pendingCount })}</p></div><span className="text-lg font-extrabold tabular-nums text-amber-800">{pendingTotal.toLocaleString("pt-AO")} Kz</span></div>}
+    <div className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dark-400" /><Input aria-label={t("invoices.search")} placeholder={t("invoices.search")} value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} className="h-11 rounded-xl bg-white pl-10" /></div>
     {error && <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>}
 
     <Card><CardContent className="p-0">{loading ? <div className="flex justify-center py-16"><div className="size-6 animate-spin rounded-full border-2 border-brand-600/30 border-t-brand-600" /></div> : invoices.length === 0 ? <div className="flex flex-col items-center py-16 text-dark-400"><FileText className="mb-3 size-10 opacity-30" /><p className="text-sm font-medium">{t("invoices.noResults")}</p></div> : <Table>
@@ -146,16 +178,34 @@ export default function Invoices() {
         <TableCell className="pl-5 font-bold text-dark-700">{invoice.document_number ?? `#${invoice.id}`}</TableCell>
         <TableCell className="font-medium">{invoice.customer_name ?? owners.find((item) => item.id === invoice.owner_id)?.name ?? "-"}</TableCell>
         <TableCell className="font-bold tabular-nums"><span>{Number(invoice.quote_payable ?? invoice.amount).toLocaleString("pt-AO")} Kz</span>{invoice.quote_payable != null && <span className="block text-[10px] font-medium text-brand-600">{t("invoices.quote.providerTotal")}</span>}</TableCell>
-        <TableCell><Badge variant="secondary">{t(`invoices.status.${invoice.status}`)}</Badge></TableCell>
+        <TableCell><div className="flex flex-wrap items-center gap-1.5"><Badge variant="secondary">{t(`invoices.status.${invoice.status}`)}</Badge>{invoice.sync_status === "failed" && <Badge variant="destructive" title={invoice.last_sync_error ?? undefined}><AlertTriangle className="mr-1 size-3" />{t("invoices.sync.failed")}</Badge>}</div>{invoice.sync_status === "failed" && invoice.last_sync_error && <p className="mt-1 max-w-56 text-[11px] text-destructive">{invoice.last_sync_error}</p>}</TableCell>
         <TableCell className="max-w-52 truncate">{invoice.items?.[0]?.description ?? invoice.description ?? "-"}</TableCell>
         <TableCell className="pr-5"><div className="flex justify-end gap-2">
-          {invoice.status === "draft" && !hasValidQuote(invoice) && <Button size="sm" variant="outline" onClick={() => handlePreview(invoice.id)}><Calculator className="mr-1 size-3.5" />{t("invoices.actions.preview")}</Button>}
-          {invoice.status === "draft" && hasValidQuote(invoice) && <Button size="sm" variant="outline" onClick={() => handleSync(invoice.id)}><Send className="mr-1 size-3.5" />{t("invoices.actions.send")}</Button>}
-          {invoice.status === "draft" && <Button size="icon-sm" variant="ghost" onClick={() => handleStatus(invoice.id, "cancelled")} aria-label={t("common.cancel")}><X className="size-4" /></Button>}
+          {invoice.status === "draft" && hasPendingEmission(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => setEmitTarget(invoice)}><RotateCw className="mr-1 size-3.5" />{t("invoices.actions.retry")}</Button>}
+          {invoice.status === "draft" && !hasPendingEmission(invoice) && !hasValidQuote(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => handlePreview(invoice.id)}><Calculator className="mr-1 size-3.5" />{t("invoices.actions.preview")}</Button>}
+          {invoice.status === "draft" && !hasPendingEmission(invoice) && hasValidQuote(invoice) && <Button size="sm" variant="outline" disabled={busyId === invoice.id} onClick={() => setEmitTarget(invoice)}><Send className="mr-1 size-3.5" />{t("invoices.actions.send")}</Button>}
+          {invoice.status === "draft" && !hasPendingEmission(invoice) && <Button size="icon-sm" variant="ghost" disabled={busyId === invoice.id} onClick={() => handleStatus(invoice.id, "cancelled")} aria-label={t("invoices.actions.cancel")}><X className="size-4" /></Button>}
           {invoice.document_url && <a href={invoice.document_url} target="_blank" rel="noreferrer" aria-label={t("invoices.actions.openDocument")} className="inline-flex size-7 items-center justify-center rounded-lg text-dark-500 hover:bg-dark-100"><ExternalLink className="size-4" /></a>}
         </div></TableCell>
       </TableRow>)}</TableBody>
-    </Table>}</CardContent></Card>
+    </Table>}<ListPagination page={page} total={total} onPageChange={setPage} /></CardContent></Card>
+
+    <ConfirmDialog
+      open={emitTarget !== null}
+      onOpenChange={(open) => { if (!open) setEmitTarget(null); }}
+      title={t(emitTarget && hasPendingEmission(emitTarget) ? "invoices.emit.retryTitle" : "invoices.emit.title")}
+      description={t("invoices.emit.description")}
+      confirmLabel={t(emitTarget && hasPendingEmission(emitTarget) ? "invoices.actions.retry" : "invoices.actions.send")}
+      cancelLabel={t("common.cancel")}
+      pending={emitTarget !== null && busyId === emitTarget.id}
+      onConfirm={confirmEmission}
+    >
+      {emitTarget && <dl className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-3 text-sm">
+        <dt className="text-muted-foreground">{t("invoices.table.owner")}</dt><dd className="text-right font-medium">{emitTarget.customer_name ?? "-"}</dd>
+        <dt className="text-muted-foreground">{t("invoices.form.documentType")}</dt><dd className="text-right font-medium">{emitTarget.document_type}</dd>
+        <dt className="text-muted-foreground">{t("invoices.quote.providerTotal")}</dt><dd className="text-right font-bold tabular-nums">{Number(emitTarget.quote_payable ?? emitTarget.amount).toLocaleString("pt-AO")} Kz</dd>
+      </dl>}
+    </ConfirmDialog>
 
     {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setShowForm(false)}><div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-dark-100 bg-white px-6 py-4"><div><h2 className="font-bold text-dark-900">{t("invoices.new")}</h2><p className="mt-0.5 text-xs text-dark-400">{t("invoices.createHint")}</p></div><Button type="button" size="icon-sm" variant="ghost" onClick={() => setShowForm(false)}><X className="size-4" /></Button></div>

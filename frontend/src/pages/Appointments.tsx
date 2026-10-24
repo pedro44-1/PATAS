@@ -26,6 +26,7 @@ import { clinicDateInput, parseApiDate } from "@/lib/date";
 import { Plus, Search, CalendarDays, Check, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiErrorMessage } from "@/api/errors";
+import { OPTIONS_LIMIT } from "@/api/pagination";
 
 const CREATE_PET_VALUE = "__create_pet__";
 const CREATE_OWNER_VALUE = "__create_owner__";
@@ -80,7 +81,7 @@ export default function Appointments() {
 
   function load() {
     setLoading(true);
-    Promise.all([appointmentsApi.list({ dateFrom: filterStartDate, dateTo: filterEndDate }), petsApi.list(), ownersApi.list(), appointmentsApi.vets(), serviceTypesApi.list()])
+    Promise.all([appointmentsApi.list({ dateFrom: filterStartDate, dateTo: filterEndDate, limit: OPTIONS_LIMIT }), petsApi.list({ limit: OPTIONS_LIMIT }), ownersApi.list({ limit: OPTIONS_LIMIT }), appointmentsApi.vets(), serviceTypesApi.list()])
       .then(([apptsRes, petsRes, ownersRes, vetsRes, serviceTypesRes]) => {
         setAppointments(apptsRes.data);
         setPets(petsRes.data);

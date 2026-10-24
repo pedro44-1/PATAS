@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiErrorMessage } from "@/api/errors";
+import { OPTIONS_LIMIT } from "@/api/pagination";
 import { FormError } from "@/components/ui/form-error";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -54,7 +55,7 @@ export default function WaitingRoom() {
     Promise.all([
       waitingRoomApi.list({ date, q: search || undefined }),
       appointmentsApi.list(date),
-      petsApi.list(),
+      petsApi.list({ limit: OPTIONS_LIMIT }),
       appointmentsApi.vets(),
       serviceTypesApi.list(),
     ])

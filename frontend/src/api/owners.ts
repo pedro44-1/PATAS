@@ -1,4 +1,5 @@
 import api from "./client";
+import type { PageParams } from "./pagination";
 
 export interface Owner {
   id: number;
@@ -24,7 +25,8 @@ export interface OwnerCreate {
 }
 
 export const ownersApi = {
-  list: (includeArchived = false) => api.get<Owner[]>("/owners/", { params: { include_archived: includeArchived } }),
+  list: ({ includeArchived = false, ...params }: PageParams & { includeArchived?: boolean } = {}) =>
+    api.get<Owner[]>("/owners/", { params: { ...params, include_archived: includeArchived } }),
   create: (data: OwnerCreate) => api.post<Owner>("/owners/", data),
   get: (id: number) => api.get<Owner>(`/owners/${id}`),
   update: (id: number, data: Partial<OwnerCreate>) =>

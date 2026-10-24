@@ -642,3 +642,75 @@ def test_draft_with_pending_emission_cannot_change(client, vet_headers, invoice,
     stored = client.get(f"/api/v1/invoices/{invoice.id}", headers=vet_headers).json()
     assert stored["idempotency_key"]
     assert float(stored["amount"]) == 100.0
+
+
+def test_draft_cannot_be_marked_sent_without_provider(client, vet_headers, invoice):
+    response = client.patch(f"/api/v1/invoices/{invoice.id}", headers=vet_headers, json={"status": "sent"})
+    assert response.status_code == 409
+
+
+def test_appointment_accepts_only_one_active_invoice(client, vet_headers, invoice, owner):
+    payload = {
+        "owner_id": owner.id,
+        "appointment_id": invoice.appointment_id,
+        "items": [{"description": "Consulta", "kind": "SERVICE", "unit": "UN", "quantity": 1, "unit_price": 100, "tax_rate": 0}],
+    }
+    duplicate = client.post("/api/v1/invoices/", headers=vet_headers, json=payload)
+    assert duplicate.status_code == 409
+
+    cancelled = client.patch(
+        f"/api/v1/invoices/{invoice.id}", headers=vet_headers,
+        json={"status": "cancelled", "reason": "Emitida por engano"},
+    )
+    assert cancelled.status_code == 200
+    assert client.post("/api/v1/invoices/", headers=vet_headers, json=payload).status_code == 200
+
+
+def test_cancelled_appointment_cannot_be_invoiced(client, vet_headers, appointment, owner, db_session):
+    from src.models.appointment import AppointmentStatus
+
+    appointment.status = AppointmentStatus.CANCELLED
+    db_session.commit()
+    response = client.post("/api/v1/invoices/", headers=vet_headers, json={
+        "owner_id": owner.id,
+        "appointment_id": appointment.id,
+        "items": [{"description": "Consulta", "kind": "SERVICE", "unit": "UN", "quantity": 1, "unit_price": 100, "tax_rate": 0}],
+    })
+    assert response.status_code == 409
+
+
+def test_definitive_provider_rejection_allows_new_preview(client, vet_headers, invoice, monkeypatch):
+    import httpx
+
+    class RejectingAdapter:
+        name = "vendas"
+
+        def emit_invoice(self, payload):
+            response = httpx.Response(
+                422,
+                json={"code": "CUSTOMER_INVALID"},
+                request=httpx.Request("POST", "http://vendas.test/invoices"),
+            )
+            raise httpx.HTTPStatusError("invalid", request=response.request, response=response)
+
+    assert client.post(f"/api/v1/invoices/{invoice.id}/preview", headers=vet_headers).status_code == 200
+    monkeypatch.setattr("src.api.invoices.get_billing_adapter", lambda: RejectingAdapter())
+    failed = client.post(f"/api/v1/invoices/{invoice.id}/sync", headers=vet_headers)
+    assert failed.status_code == 502
+    stored = client.get(f"/api/v1/invoices/{invoice.id}", headers=vet_headers).json()
+    assert stored["sync_status"] == "failed"
+    assert stored["idempotency_key"] is None
+    assert stored["last_sync_error"]
+
+    monkeypatch.undo()
+    assert client.post(f"/api/v1/invoices/{invoice.id}/preview", headers=vet_headers).status_code == 200
+
+
+def test_list_invoices_filters_by_pet_and_query(client, vet_headers, invoice, pet, db_session):
+    by_pet = client.get("/api/v1/invoices/", headers=vet_headers, params={"pet_id": pet.id})
+    assert [item["id"] for item in by_pet.json()] == [invoice.id]
+    assert by_pet.headers["X-Total-Count"] == "1"
+    other_pet = client.get("/api/v1/invoices/", headers=vet_headers, params={"pet_id": pet.id + 999})
+    assert other_pet.json() == []
+    by_owner_name = client.get("/api/v1/invoices/", headers=vet_headers, params={"q": "Test Owner"})
+    assert [item["id"] for item in by_owner_name.json()] == [invoice.id]
